@@ -1,0 +1,5 @@
+docker-report (0.0.1-1) unstable; urgency=medium
+
+  * Initial release. This only includes the reporter. (Closes: T241206)
+
+ -- Giuseppe Lavagetto <glavagetto@wikimedia.org>  Thu, 19 Dec 2019 13:14:20 +0100

@@ -1,0 +1,18 @@
+Source: docker-report
+Section: admin
+Priority: optional
+Maintainer: Giuseppe Lavagetto <glavagetto@wikimedia.org>
+Build-Depends: debhelper-compat (= 12), dh-python, python3-setuptools, python3-all,
+    python3-setuptools, python3-setuptools-scm, python3-pytest-cov,python3-pytest-runner,
+    python3-requests-mock
+Standards-Version: 4.4.1
+
+Package: python3-docker-report
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}
+Suggests: python-docker-report-doc
+Description: Tools to report metadata of images. (Python 3)
+ The current version only supports debmonitor.
+ .
+ This package installs the library for Python 3.
+
