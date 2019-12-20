@@ -33,7 +33,7 @@ setup(
         "Topic :: System :: Systems Administration",
     ],
     description="Tools collection to report data about docker images to (for now) debmonitor",
-    install_requires=[],
+    install_requires=["requests"],
     keywords=["docker-report", "debmonitor", "docker", "apt", "deb"],
     license="GPLv3+",
     long_description=long_description,
@@ -43,5 +43,10 @@ setup(
     setup_requires=setup_requires,
     use_scm_version=True,
     zip_safe=False,
-    entry_points={"console_scripts": {"docker-report-debmonitor = docker_report.debmonitor:main"}},
+    entry_points={
+        "console_scripts": [
+            "docker-report-debmonitor = docker_report.debmonitor:main",
+            "docker-report = docker_report.reporter:main",
+        ]
+    },
 )

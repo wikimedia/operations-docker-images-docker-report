@@ -41,7 +41,7 @@ class RegistryBrowserError(Exception):
 
 
 class RegistryBrowser:
-    """Allows to browse the catalog of a standar docker registry"""
+    """Allows to browse the catalog of a standard docker registry"""
 
     # TODO: Add type declarations once possible
     # Filters on the image names.

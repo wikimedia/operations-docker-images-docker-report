@@ -2,7 +2,6 @@ import logging
 import subprocess
 
 from unittest import mock
-from typing import List
 
 import pytest
 
@@ -25,16 +24,16 @@ def test_setup_logging():
     """Test that logging gets set up"""
     args = ["--debug", "image_name", "directory"]
     options = debmonitor.parse_args(args)
-    debmonitor.setup_logging(options)
+    debmonitor.setup_logging(debmonitor.logger, options)
     assert debmonitor.logger.level == logging.DEBUG
     options = debmonitor.parse_args(["image", "dir"])
-    debmonitor.setup_logging(options)
+    debmonitor.setup_logging(debmonitor.logger, options)
     assert debmonitor.logger.level == logging.INFO
 
 
 @pytest.fixture
-def report(args: List = ["docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1", "/tmp"]):
-    return debmonitor.DockerReport(debmonitor.parse_args(args))
+def report(name: str = "docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1", report_dir: str = "/tmp"):
+    return debmonitor.DockerReport(name, report_dir)
 
 
 def test_report_init(report):
@@ -95,13 +94,20 @@ def test_cmd_ok(mocker, report):
     debmonitor.logger.debug.assert_called_with("success!")
 
 
+def test_prune_image(report):
+    report._cmd = mock.MagicMock()
+    report.prune_image()
+    report._cmd.assert_called_with(
+        "Image pruning", ["docker", "rmi", "-f", "docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1"]
+    )
+
+
 @mock.patch("docker_report.debmonitor.DockerReport")
 def test_main(mocker):
     with pytest.raises(SystemExit) as se:
         debmonitor.main(["--keep", "image", "dir"])
         assert se.code == 0
-    opts = debmonitor.parse_args(["--keep", "image", "dir"])
-    mocker.assert_called_with(opts)
+    mocker.assert_called_with("image", "dir")
     mocker.return_value.generate_report.assert_called_with()
     mocker.return_value.submit_report.assert_called_with()
 
@@ -146,7 +152,7 @@ def test_main_keep(cmd, rmtree):
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
 def test_main_no_submit(cmd, rmtree):
     """Test no submission"""
-    report = debmonitor.DockerReport(debmonitor.parse_args(["image", "/dir"]))
+    report = debmonitor.DockerReport("image", "/dir")
     with pytest.raises(SystemExit):
         debmonitor.main(["--no-submit", "image", "/dir"])
         assert rmtree.call_count == 0

@@ -30,14 +30,9 @@ import subprocess
 
 from typing import List
 
+from docker_report import CustomFormatter, setup_logging
 
-# Helper functions below taken from
-# https://vincent.bernat.ch/en/blog/2019-sustainable-python-script
 logger = logging.getLogger(os.path.splitext(os.path.basename(sys.argv[0]))[0])
-
-
-class CustomFormatter(argparse.RawDescriptionHelpFormatter, argparse.ArgumentDefaultsHelpFormatter):
-    pass
 
 
 def parse_args(args: List[str]) -> argparse.Namespace:
@@ -55,17 +50,6 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-def setup_logging(options: argparse.Namespace):
-    """Configure logging."""
-    root = logging.getLogger()
-    root.setLevel(logging.WARNING)
-    logger.setLevel(options.debug and logging.DEBUG or logging.INFO)
-    if not options.silent:
-        ch = logging.StreamHandler()
-        ch.setFormatter(logging.Formatter("%(levelname)s[%(name)s] %(message)s"))
-        logger.addHandler(ch)
-
-
 class DockerReportError(Exception):
     pass
 
@@ -73,9 +57,9 @@ class DockerReportError(Exception):
 class DockerReport:
     """Reports content of a docker image to debmonitor."""
 
-    def __init__(self, options: argparse.Namespace):
-        self.image = options.image_name
-        self.report_dir = options.report_dir
+    def __init__(self, image_name: str, report_dir: str):
+        self.image = image_name
+        self.report_dir = report_dir
         self.proxy = os.environ.get("http_proxy")
         self.file_basename = "{}.debmonitor.json".format(self.image.replace("/", "-"))
         self.filename = os.path.join(self.report_dir, self.file_basename)
@@ -132,12 +116,16 @@ class DockerReport:
         """Submit the report"""
         self._cmd("Submit report", ["debmonitor-client-unpriv", "-f", self.filename])
 
+    def prune_image(self):
+        """Remove the image"""
+        self._cmd("Image pruning", ["docker", "rmi", "-f", self.image])
+
 
 def main(args=None):
     exitcode = 0
     options = parse_args(args)
-    setup_logging(options)
-    report = DockerReport(options)
+    setup_logging(logger, options)
+    report = DockerReport(options.image_name, options.report_dir)
     try:
         report.generate_report()
         if not options.no_submit:
