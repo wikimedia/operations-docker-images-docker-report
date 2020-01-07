@@ -1,4 +1,4 @@
-docker-report (0.0.1-1) stretch-wikimedia; urgency=medium
+docker-report (0.0.1-1) buster-wikimedia; urgency=medium
 
   * Initial release. This only includes the reporter. (Closes: T241206)
 

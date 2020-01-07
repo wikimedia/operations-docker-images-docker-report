@@ -2,7 +2,7 @@ Source: docker-report
 Section: admin
 Priority: optional
 Maintainer: Giuseppe Lavagetto <glavagetto@wikimedia.org>
-Build-Depends: debhelper-compat (= 12), dh-python, python3-setuptools, python3-all,
+Build-Depends: debhelper, dh-python, python3-setuptools, python3-all,
     python3-setuptools, python3-setuptools-scm, python3-pytest-cov,python3-pytest-runner,
     python3-requests-mock
 Standards-Version: 4.4.1
