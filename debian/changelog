@@ -1,4 +1,4 @@
-docker-report (0.0.1-1) unstable; urgency=medium
+docker-report (0.0.1-1) stretch-wikimedia; urgency=medium
 
   * Initial release. This only includes the reporter. (Closes: T241206)
 
