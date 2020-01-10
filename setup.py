@@ -47,6 +47,7 @@ setup(
         "console_scripts": [
             "docker-report-debmonitor = docker_report.debmonitor:main",
             "docker-report = docker_report.reporter:main",
+            "docker-registryctl = docker_report.registryctl:main",
         ]
     },
 )

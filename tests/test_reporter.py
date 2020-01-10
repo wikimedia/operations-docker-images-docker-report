@@ -1,14 +1,14 @@
-import pytest
 import io
 import os
-import stat
 import shutil
+import stat
 import tempfile
-
 from unittest import mock
 
+import pytest
+
 from docker_report import reporter
-from docker_report.registry_browser import RegistryBrowser
+from docker_report.registry.browser import RegistryBrowser
 
 
 @pytest.fixture
@@ -134,6 +134,28 @@ banana = bread
     assert tag == []
 
 
+def test_filters_from_file_bad_rule_action():
+    """An invalid rule action gets ignored"""
+    configfile = b"""
+[invalid_image_rule]
+action = exclude
+name = bread:slice
+
+[invalid_name_match]
+action = include
+name_match = gibberish!
+tag = regex:test
+
+[invalid_tag]
+action = include
+tag = invalid
+"""
+    with mock.patch("configparser.ConfigParser.read", monkey_patch_read):
+        name, tag = reporter._filters_from_file(configfile)
+    assert name == []
+    assert tag == []
+
+
 def test_filters_from_file_include():
     """Inclusion rules are whitelists"""
     configfile = b"""
@@ -203,7 +225,7 @@ def test_get_images(rep):
 
 
 def test_get_images_error(rep):
-    rep._browser.get_image_tags.side_effect = reporter.RegistryBrowserError("fail!")
+    rep._browser.get_image_tags.side_effect = reporter.RegistryError("fail!")
     assert list(rep.get_images()) == []
     assert rep.exitcode == 2
 

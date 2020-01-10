@@ -25,9 +25,8 @@ import argparse
 import logging
 import os
 import shutil
-import sys
 import subprocess
-
+import sys
 from typing import List
 
 from docker_report import CustomFormatter, setup_logging

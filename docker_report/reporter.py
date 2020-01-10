@@ -62,16 +62,17 @@ import grp
 import logging
 import os
 import re
-import stat
 import shutil
+import stat
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Dict, Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple
 
 from docker_report import CustomFormatter, setup_logging
 from docker_report.debmonitor import DockerReport, DockerReportError
-from docker_report.registry_browser import ImageFilter, RegistryBrowser, RegistryBrowserError, TagFilter
+from docker_report.registry import RegistryError
+from docker_report.registry.browser import ImageFilter, RegistryBrowser, TagFilter
 
 logger = logging.getLogger("docker-report")
 
@@ -142,20 +143,40 @@ def _filters_from_file(filename: str) -> Tuple[List[ImageFilter], List[TagFilter
     for name, rules in config.items():
         logger.debug("Loading rule %s", name)
         if "tag" in rules:
-            tag_filters.append(_tag(rules))
+            tag_rule = _tag(rules)
+            if tag_rule is not None:
+                tag_filters.append(tag_rule)
         elif "name" in rules:
-            image_filters.append(_image(rules))
+            img_rule = _image(rules)
+            if img_rule is not None:
+                image_filters.append(img_rule)
         else:
             logger.warning("Discarding rule %s - it contains no conditions", name)
     return (image_filters, tag_filters)
 
 
-def _tag(rules: Dict) -> TagFilter:
-    if "name_match" in rules:
+def isTrue(x: str) -> bool:
+    """Null rule."""
+    return True
+
+
+def _tag(rules: configparser.SectionProxy) -> Optional[TagFilter]:
+    try:
         name_cond = _parse_rule(rules["name_match"])
-    else:
-        name_cond = lambda x: True  # noqa: E731
-    tag_cond = _parse_rule(rules["tag"])
+    except ValueError as e:
+        logger.warning("Error while evaluating tag rule - invalid name_match: %s", e)
+        # Invalid rule for name match - we *ignore* the whole rule.
+        return None
+    except KeyError:
+        # No image name match
+        name_cond = isTrue
+
+    try:
+        tag_cond = _parse_rule(rules["tag"])
+    except ValueError as e:
+        # We ignore invalid tag rules.
+        logger.warning("Error while evaluating tag rule - invalid tag: %s", e)
+        return None
 
     def _condition(data):
         # If the name condition doesn't match, we do not apply filtering logic
@@ -171,20 +192,28 @@ def _tag(rules: Dict) -> TagFilter:
     return _condition
 
 
-def _image(rules: Dict) -> ImageFilter:
-    name_cond = _parse_rule(rules["name"])
-    if rules["action"] == "exclude":
-        return lambda name: not name_cond(name)
-    else:
-        return lambda name: name_cond(name)
-
-
-def _parse_rule(rule: str) -> Callable[[str], bool]:
+def _parse_rule(rule: str) -> ImageFilter:
     if rule.startswith("regex:"):
         regex = re.compile(rule[6:])
         return lambda x: bool(regex.search(x))
-    if rule.startswith("contains:"):
+    elif rule.startswith("contains:"):
         return lambda x: (rule[9:] in x)
+    else:
+        # Invalid rule. We ignore it in the callers
+        raise ValueError("Unrecognized rule %s", rule)
+
+
+def _image(rules: configparser.SectionProxy) -> Optional[ImageFilter]:
+    try:
+        name_cond = _parse_rule(rules["name"])
+    except ValueError as e:
+        logger.warning(e)
+        # Invalid rule - we ignore it
+        return None
+    if rules.get("action", "include") == "exclude":
+        return lambda name: not name_cond(name)
+    else:
+        return name_cond
 
 
 def _tempdir() -> str:
@@ -202,8 +231,8 @@ class Reporter:
         self.exitcode = 0
         self._tempdir = tempdir
         self._prune_images = not keep_images
-        self._failed = []
-        self._success = []
+        self._failed = []  # type: List[str]
+        self._success = []  # type: List[str]
 
     def run_report(self, image: str):
         """Run the report on one image"""
@@ -230,7 +259,7 @@ class Reporter:
             for name, tags in self._browser.get_image_tags(sort=True).items():
                 tag = tags[-1]
                 yield self._image_full_name(name, tag)
-        except RegistryBrowserError:
+        except RegistryError:
             self.exitcode = 2
 
     def pprint(self):
@@ -253,11 +282,10 @@ def main(args=None):
         registry = setup_browser(options)
         report = Reporter(registry, tempdir, options.keep)
         with ThreadPoolExecutor(max_workers=options.concurrency) as executor:
-            for result in executor.map(report.run_report, report.get_images()):
+            for _ in executor.map(report.run_report, report.get_images()):
                 # Do nothing here, just catch exceptions.
                 pass
-        if not options.silent:
-            report.pprint()
+        report.pprint()
     except Exception:
         logger.exception("Unexpected error during execution")
         report.exitcode = 1

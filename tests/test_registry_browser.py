@@ -2,9 +2,9 @@ from unittest import mock
 
 import pytest
 import requests
-import requests_mock
 
-from docker_report.registry_browser import RegistryBrowser, RegistryBrowserError
+from docker_report.registry import RegistryError
+from docker_report.registry.browser import RegistryBrowser, RegistryBrowserError
 
 
 @pytest.fixture
@@ -13,22 +13,6 @@ def browser():
     rb = RegistryBrowser("httpbin.org")
     rb._get_all_pages = mock.MagicMock()
     return rb
-
-
-def test_pagination():
-    """Test pagination works."""
-    browser = RegistryBrowser("httpbin.org")
-    with requests_mock.Mocker() as m:
-        first_resp = {"repositories": ["bar", "baz", "baz/foo", "foo"]}
-        m.get(
-            "https://httpbin.org/v2/_catalog",
-            headers={"link": '</v2/_catalog?last=foo&n=100>; rel="next"'},
-            json=first_resp,
-        )
-        second_resp = {"repositories": ["test/pinkunicorn"]}
-        m.get("https://httpbin.org/v2/_catalog?last=foo&n=100", json=second_resp)
-        results = browser._get_all_pages("/v2/_catalog")
-        assert {"repositories": ["test/pinkunicorn"]} in results
 
 
 def test_get_images_list(browser):
@@ -66,7 +50,7 @@ def test_request_error():
     """If a request raises an error, raise a localized exception"""
     rb = RegistryBrowser("httpbin.org")
     rb._request = mock.MagicMock(side_effect=requests.RequestException("test"))
-    with pytest.raises(RegistryBrowserError):
+    with pytest.raises(RegistryError):
         rb.get_image_tags()
 
 
