@@ -60,12 +60,15 @@ class Registry:
             self.logger.warning("Could not read the settings file.")
         return None
 
-    def _request(self, url_part: str, method: str = "GET") -> requests.Response:
+    def _request(self, url_part: str, method: str = "GET", use_v2: bool = False) -> requests.Response:
         """Perform a request to the registry"""
+        headers = {}
         if self.auth is not None:
-            headers = {"Authorization": "Basic {}".format(self.auth)}
+            headers["Authorization"] = "Basic {}".format(self.auth)
+        if use_v2:
+            headers["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
         else:
-            headers = {}
+            headers["Accept"] = "application/vnd.docker.distribution.manifest.v1+json"
         url = "https://{}{}".format(self.registry_url, url_part)
         response = requests.request(method, url, headers=headers)
         response.raise_for_status()

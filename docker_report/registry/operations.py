@@ -27,7 +27,7 @@ class RegistryOperations(Registry):
 
     def _image_digest(self, name: str, tag: str) -> str:
         """Given an image name and tag, it returns the sha256 digest"""
-        resp = self._request("/v2/{}/manifests/{}".format(name, tag))
+        resp = self._request("/v2/{}/manifests/{}".format(name, tag), use_v2=True)
         return resp.headers.get("Docker-Content-Digest", "")
 
     def delete_image(self, name: str, tag_glob: str) -> Tuple[List[str], List[str]]:
@@ -44,7 +44,7 @@ class RegistryOperations(Registry):
             try:
                 digest = self._image_digest(name, tag)
                 delete_url = "/v2/{}/manifests/{}".format(name, digest)
-                self._request(delete_url, method="DELETE")
+                self._request(delete_url, method="DELETE", use_v2=True)
             except requests.RequestException:
                 self.logger.exception("Error deleting the image %s:%s from the registry", name, tag)
                 failed.append(tag)

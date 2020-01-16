@@ -16,7 +16,11 @@ def operations() -> RegistryOperations:
 def test_image_digest(operations):
     """Getting the digest of an image/tag couple works."""
     with requests_mock.Mocker() as m:
-        m.get("https://httpbin.org/v2/foobar/manifests/latest", headers={"Docker-Content-Digest": "ok"})
+        m.get(
+            "https://httpbin.org/v2/foobar/manifests/latest",
+            headers={"Docker-Content-Digest": "ok"},
+            request_headers={"Accept": "application/vnd.docker.distribution.manifest.v2+json"},
+        )
         assert operations._image_digest("foobar", "latest") == "ok"
 
 
