@@ -1,3 +1,9 @@
+docker-report (0.0.3-1) buster-wikimedia; urgency=medium
+
+  * Use v2 header when ap
+
+ -- Giuseppe Lavagetto <glavagetto@wikimedia.org>  Thu, 16 Jan 2020 12:20:36 +0100
+
 docker-report (0.0.2-1) buster-wikimedia; urgency=medium
 
   * Added a registryctl cli tool with the ability to list and delete images
