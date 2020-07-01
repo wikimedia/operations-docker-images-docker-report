@@ -86,6 +86,18 @@ class Registry:
                     return responses
                 # now let's inject the pagination in the query
                 url_part = resp.links["next"]["url"]
+        except requests.exceptions.HTTPError as e:
+            # Workaround for https://github.com/docker/distribution/issues/2747
+            # When using a swift backend, we get a 404 response if no tags are present
+            if e.response.status_code == 404 and url_part.endswith("/tags/list"):
+                self.logger.info(
+                    "Got a 404 not found for %s: possibly a case of https://github.com/docker/distribution/issues/2747",
+                    url_part,
+                )
+                return responses
+            else:
+                self.logger.exception("Error getting data from the registry")
+                raise RegistryError(url_part)
         except requests.RequestException:
             self.logger.exception("Error getting data from the registry")
             raise RegistryError(url_part)

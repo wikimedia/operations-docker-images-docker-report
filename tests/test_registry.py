@@ -64,3 +64,27 @@ def test_request_auth(registry):
         m.get("https://httpbin.org/v2/_catalog", headers={}, text="fail")
         m.get("https://httpbin.org/v2/_catalog", headers={"Authentication": "Basic abcd"}, text="ok")
         assert registry._request("/v2/_catalog").text == "ok"
+
+
+def test_request_no_image_tag(registry):
+    """
+    Due to https://github.com/docker/distribution/issues/2747, we get images from the catalog
+    that return 404 when queried.
+
+    So we need to correctly handle that case when getting the tags for an image
+    """
+    with requests_mock.Mocker() as m:
+        m.get(
+            "https://httpbin.org/v2/bar/tags/list",
+            status_code=404,
+            json={
+                "errors": [
+                    {
+                        "code": "NAME_UNKNOWN",
+                        "message": "repository name not known to registry",
+                        "detail": {"name": "bar"},
+                    }
+                ]
+            },
+        )
+        assert registry.get_tags_for_image("bar") == []
