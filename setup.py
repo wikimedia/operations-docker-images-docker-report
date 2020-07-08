@@ -15,9 +15,8 @@ if sys.version_info < (3, 6):
     sys.exit("docker-report requires Python 3.6 or later")
 
 # Required dependencies
-setup_requires = [
-    "setuptools_scm>=1.17.0",
-]
+setup_requires = ["setuptools_scm>=1.17.0"]
+install_requires = ["requests", "typing_extensions", "pyyaml"]
 
 setup(
     author="Giuseppe Lavagetto",
@@ -32,7 +31,7 @@ setup(
         "Topic :: System :: Systems Administration",
     ],
     description="Tools collection to report data about docker images to (for now) debmonitor",
-    install_requires=["requests"],
+    install_requires=install_requires,
     keywords=["docker-report", "debmonitor", "docker", "apt", "deb"],
     license="GPLv3+",
     long_description=long_description,
@@ -47,6 +46,7 @@ setup(
             "docker-report-debmonitor = docker_report.debmonitor:main",
             "docker-report = docker_report.reporter:main",
             "docker-registryctl = docker_report.registryctl:main",
+            "helm-chartctl = docker_report.chartctl:main",
         ]
     },
 )
