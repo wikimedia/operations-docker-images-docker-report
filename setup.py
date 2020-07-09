@@ -11,8 +11,8 @@ to report metadata about image contents to various services.
 Right now the only implemented reporter is for debmonitor.
 """
 
-if sys.version_info < (3, 5):
-    sys.exit("docker-report requires Python 3.5 or later")
+if sys.version_info < (3, 6):
+    sys.exit("docker-report requires Python 3.6 or later")
 
 # Required dependencies
 setup_requires = [
@@ -26,7 +26,6 @@ setup(
         "Development Status :: 4 - Beta",
         "Intended Audience :: System Administrators",
         "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3 :: Only",
