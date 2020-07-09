@@ -1,3 +1,9 @@
+docker-report (0.0.5-1) buster-wikimedia; urgency=medium
+
+  * Add basic chartmuseum library and helm-chartctl CLI
+
+ -- Janis Meybohm <jmeybohm@wikimedia.org>  Thu, 09 Jul 2020 15:46:50 +0200
+
 docker-report (0.0.4-1) buster-wikimedia; urgency=medium
 
   * Handle the case where a repository has no associated tags.
