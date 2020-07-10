@@ -239,6 +239,10 @@ class Reporter:
         logger.info("Building debmonitor report for %s", image)
         try:
             debmonitor = DockerReport(image, self._tempdir)
+            if not debmonitor.is_debian_image():
+                logger.warning("Unable to create a report for non debian images")
+                return
+
             debmonitor.generate_report()
             debmonitor.submit_report()
             if self._prune_images:

@@ -27,6 +27,7 @@ import os
 import shutil
 import subprocess
 import sys
+import docker  # type: ignore
 from typing import List
 
 from docker_report import CustomFormatter, setup_logging
@@ -38,9 +39,7 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     """Parse arguments."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=CustomFormatter)
     parser.add_argument("image_name", metavar="IMAGE_NAME", help="The full name:tag of the image")
-    parser.add_argument(
-        "report_dir", metavar="DIR", help="The directory where the report will be temporarily stored.",
-    )
+    parser.add_argument("report_dir", metavar="DIR", help="The directory where the report will be temporarily stored.")
     parser.add_argument("--keep", action="store_true", help="Keep the generated report even after submitting it.")
     parser.add_argument("--no-submit", "-n", action="store_true", help="Do not submit the report, just generate it.")
     log = parser.add_mutually_exclusive_group()
@@ -62,14 +61,20 @@ class DockerReport:
         self.proxy = os.environ.get("http_proxy")
         self.file_basename = "{}.debmonitor.json".format(self.image.replace("/", "-"))
         self.filename = os.path.join(self.report_dir, self.file_basename)
+        self.client = docker.from_env()
 
-    def _cmd(self, label: str, cmd: List):
+    @staticmethod
+    def _cmd_run(cmd: List) -> bytes:
+        # TODO: use subprocess.run when we're past python 3.5
+        return subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+    def _cmd(self, label: str, cmd: List) -> bytes:
         """Simplistic wrapper around subprocess."""
         try:
             logger.info("Running: %s", label.lower())
-            # TODO: use subprocess.run when we're past python 3.5
-            out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            out = self._cmd_run(cmd)
             logger.debug(out.decode("utf-8"))
+            return out
         except subprocess.CalledProcessError as e:
             logger.error("%s exited with exit code %d. Output:", label, e.returncode)
             logger.error(e.stdout.decode("utf-8"))
@@ -107,6 +112,25 @@ class DockerReport:
             " && ".join(bash_incantation),
         ]
 
+    def is_debian_image(self):
+        """Check if self.image is a debian image we can generate reports for."""
+
+        # The container is not actually run but docker daemon complains about missing command
+        # sometimes (maybe if the image does not have an entrypoint defined.
+        # To prevent this, "/false" is given as command.
+        container = self.client.containers.create(self.image, command="/false")
+
+        try:
+            _ = container.get_archive("/etc/debian_version")
+        except docker.errors.NotFound:
+            is_debian = False
+        else:
+            is_debian = True
+        finally:
+            container.remove(force=True)
+
+        return is_debian
+
     def generate_report(self):
         """Generate the report."""
         self._cmd("Report generation", self._docker_cmd())
@@ -125,6 +149,10 @@ def main(args=None):
     options = parse_args(args)
     setup_logging(logger, options)
     report = DockerReport(options.image_name, options.report_dir)
+    if not report.is_debian_image():
+        logger.warning("Unable to create a report for non debian images")
+        sys.exit(exitcode)
+
     try:
         report.generate_report()
         if not options.no_submit:
