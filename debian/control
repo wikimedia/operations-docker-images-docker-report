@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Giuseppe Lavagetto <glavagetto@wikimedia.org>
 Build-Depends: debhelper, dh-python, python3-setuptools, python3-all,
     python3-setuptools, python3-setuptools-scm, python3-pytest-cov,python3-pytest-runner,
-    python3-requests-mock, python3-yaml
+    python3-requests-mock, python3-yaml, python3-docker
 Standards-Version: 4.4.1
 
 Package: python3-docker-report
