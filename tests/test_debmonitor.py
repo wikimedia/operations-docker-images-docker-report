@@ -104,7 +104,7 @@ def test_prune_image(report):
     )
 
 
-def test_is_debian_image(report):
+def test_is_debian_image_ok(report):
     container_mock = mock.MagicMock()
     report.client.containers.create.return_value = container_mock
     assert report.is_debian_image() is True
@@ -112,9 +112,31 @@ def test_is_debian_image(report):
     container_mock.get_archive.assert_called_with("/etc/debian_version")
     container_mock.remove.assert_called_with(force=True)
 
+
+def test_is_debian_image_error(report):
+    container_mock = mock.MagicMock()
+    report.client.containers.create.return_value = container_mock
     container_mock.get_archive.side_effect = docker_errors.NotFound("whatever")
     assert report.is_debian_image() is False
     container_mock.remove.assert_called_with(force=True)
+
+
+def test_is_debian_image_pull_error(report):
+    debmonitor.logger.error = mock.MagicMock()
+    report.client.images.pull.side_effect = docker_errors.NotFound("whatever")
+    assert report.is_debian_image() is False
+    debmonitor.logger.error.assert_called_with(
+        "Failed to pull/create image %s: %s", report.image, report.client.images.pull.side_effect
+    )
+
+
+def test_is_debian_image_create_error(report):
+    debmonitor.logger.error = mock.MagicMock()
+    report.client.containers.create.side_effect = docker_errors.NotFound("whatever")
+    assert report.is_debian_image() is False
+    debmonitor.logger.error.assert_called_with(
+        "Failed to pull/create image %s: %s", report.image, report.client.containers.create.side_effect
+    )
 
 
 @mock.patch("docker_report.debmonitor.DockerReport")

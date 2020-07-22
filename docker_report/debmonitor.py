@@ -115,10 +115,17 @@ class DockerReport:
     def is_debian_image(self):
         """Check if self.image is a debian image we can generate reports for."""
 
-        # The container is not actually run but docker daemon complains about missing command
-        # sometimes (maybe if the image does not have an entrypoint defined.
-        # To prevent this, "/false" is given as command.
-        container = self.client.containers.create(self.image, command="/false")
+        try:
+            # containers.create does not pull the image, so we need to pull manually
+            self.client.images.pull(self.image)
+
+            # The container is not actually run but docker daemon complains about missing command
+            # sometimes (maybe if the image does not have an entrypoint defined.
+            # To prevent this, "/false" is given as command.
+            container = self.client.containers.create(self.image, command="/false")
+        except Exception as e:
+            logger.error("Failed to pull/create image %s: %s", self.image, e)
+            return False
 
         try:
             _ = container.get_archive("/etc/debian_version")
