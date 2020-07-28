@@ -43,6 +43,8 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
     push.add_argument("path", metavar="PATH", type=Path, help="Path to the chart to package and push")
     walk = actions.add_parser("walk")
     walk.add_argument("path", metavar="PATH", type=Path, help="Path to walk for charts")
+    upload = actions.add_parser("upload")
+    upload.add_argument("path", metavar="PATH", type=Path, help="Path to the chart tgz to upload")
 
     cm = parser.add_argument_group()
     cm.add_argument(
@@ -77,14 +79,22 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
     return options
 
 
+def upload(cm: Chartmuseum, repository: str, path: Path) -> bool:
+    """Push a chart tgz"""
+    res = cm.upload_chart(repository, path)
+    if res.status_code == 201:
+        logger.info("Chart uploaded: %s", path.name)
+    elif res.status_code == 409:
+        logger.info("Chart already exists in repository: %s", path.name)
+    else:
+        return False
+    return True
+
+
 def push(cm: Chartmuseum, repository: str, path: Path):
     """Package and push a single chart"""
     chart_tgz = package_chart(path)
-    res = cm.upload_chart(repository, chart_tgz)
-    if res.status_code == 201:
-        logger.info("Chart uploaded: %s", chart_tgz.name)
-    elif res.status_code == 409:
-        logger.info("Chart already exists in repository: %s", chart_tgz.name)
+    upload(cm, repository, chart_tgz)
     shutil.rmtree(chart_tgz.parent)
 
 
@@ -105,16 +115,14 @@ def main(args=None):
     setup_logging(logger, options, logging.ERROR)
     retcode = 0
 
-    if options.action not in ("push", "walk"):
-        logger.error("non-implemented action")
-        retcode = 3
-
     try:
         cm = Chartmuseum(options.cm_url, options.cm_user, options.cm_password, logger=logger)
         if options.action == "push":
             push(cm, options.repository, options.path)
         elif options.action == "walk":
             walk(cm, options.repository, options.path)
+        elif options.action == "upload":
+            upload(cm, options.repository, options.path)
     except ChartmuseumError:
         logger.exception("Error interacting with the repository")
         retcode = 2

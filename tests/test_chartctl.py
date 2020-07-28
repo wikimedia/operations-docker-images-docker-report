@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 from docker_report import chartctl
 
 
@@ -22,6 +24,18 @@ def test_parse_args_walk():
     assert options.repository == "nowhere"
     assert options.path == Path("/tmp/foo")
     assert options.cm_url == "https://httpbin.org/foo"
+
+
+def test_parse_args_upload():
+    options = chartctl.parse_args(["--silent", "upload", "/tmp/foo/file.tgz", "nowhere"])
+    assert options.silent is True
+    assert options.action == "upload"
+    assert options.path == Path("/tmp/foo/file.tgz")
+
+
+def test_parse_args_unknown_action():
+    with pytest.raises(SystemExit):
+        chartctl.parse_args(["--silent", "noaction", "/tmp/foo/file.tgz", "nowhere"])
 
 
 def test_parse_args_auth():
