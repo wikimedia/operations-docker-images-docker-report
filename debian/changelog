@@ -1,3 +1,12 @@
+docker-report (0.0.8-2) buster-wikimedia; urgency=medium
+
+  * Use helm3 to package charts. As helm 3 is backwards compatible with
+    apiVersion v1 (helm 2) we can use it to package helm 2 charts as well.
+    Bug: T268743
+  * Mock docker.from_env() in tests.
+
+ -- Janis Meybohm <jmeybohm@wikimedia.org>  Wed, 02 Dec 2020 10:20:55 +0100
+
 docker-report (0.0.8-1) buster-wikimedia; urgency=medium
 
   * Add action "upload" to upload prebuild helm chart archives.

@@ -48,7 +48,7 @@ def get_chart_name_version(chart_yaml: Path) -> Tuple[str, str]:
 def package_chart(chart_path: Path) -> Path:
     """Package the chart in chart_path, return the path to chart tgz"""
     output_dir = Path(tempfile.mkdtemp())
-    cmd = ["helm", "package", "--save=false", "--destination", str(output_dir.absolute()), str(chart_path.absolute())]
+    cmd = ["helm3", "package", "--destination", str(output_dir.absolute()), str(chart_path.absolute())]
     try:
         logger.info("Running helm package for: %s", chart_path.absolute())
         out = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode("utf-8").strip()
