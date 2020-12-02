@@ -151,6 +151,7 @@ def test_main(mocker):
 
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_not_ok(mocker, is_debian_image_mock):
     is_debian_image_mock.return_value = True
     # Case 1: expected exception
@@ -162,6 +163,7 @@ def test_main_not_ok(mocker, is_debian_image_mock):
 
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_unexpected(mocker, is_debian_image_mock):
     is_debian_image_mock.return_value = True
     # Case 2: unexpected exception
@@ -174,6 +176,7 @@ def test_main_unexpected(mocker, is_debian_image_mock):
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("shutil.rmtree")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_removal(cmd, rmtree, is_debian_image_mock):
     """Test the file is removed with the right cli options"""
     is_debian_image_mock.return_value = True
@@ -185,6 +188,7 @@ def test_main_removal(cmd, rmtree, is_debian_image_mock):
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("shutil.rmtree")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_keep(cmd, rmtree, is_debian_image_mock):
     """Test the file is removed with the right cli options"""
     is_debian_image_mock.return_value = True
@@ -196,6 +200,7 @@ def test_main_keep(cmd, rmtree, is_debian_image_mock):
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("shutil.rmtree")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_no_submit(cmd, rmtree, is_debian_image_mock):
     """Test no submission"""
     is_debian_image_mock.return_value = True
@@ -208,6 +213,7 @@ def test_main_no_submit(cmd, rmtree, is_debian_image_mock):
 
 @mock.patch("docker_report.debmonitor.DockerReport.is_debian_image")
 @mock.patch("docker_report.debmonitor.DockerReport._cmd")
+@mock.patch("docker.from_env", lambda: None)
 def test_main_no_debian_image(cmd, is_debian_image_mock):
     """Test no debian image"""
     is_debian_image_mock.return_value = False
