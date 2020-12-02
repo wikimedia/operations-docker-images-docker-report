@@ -1,4 +1,4 @@
-docker-report (0.0.8-2) buster-wikimedia; urgency=medium
+docker-report (0.0.9-1) buster-wikimedia; urgency=medium
 
   * Use helm3 to package charts. As helm 3 is backwards compatible with
     apiVersion v1 (helm 2) we can use it to package helm 2 charts as well.
