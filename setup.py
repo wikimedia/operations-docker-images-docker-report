@@ -16,7 +16,7 @@ if sys.version_info < (3, 6):
 
 # Required dependencies
 setup_requires = ["setuptools_scm>=1.17.0"]
-install_requires = ["requests", "pyyaml", "docker"]
+install_requires = ["requests", "pyyaml", "docker", "wmflib"]
 
 setup(
     author="Giuseppe Lavagetto",

@@ -25,9 +25,19 @@ from typing import Dict, List, Optional
 
 import requests
 
+from wmflib.requests import http_session  # type: ignore
+
 REGISTRY_PAGINATION_RE = re.compile(r"<([^>]*)>")
 
 logger = logging.getLogger(__name__)
+
+
+def requests_session(retries: int = 3, backoff: int = 10) -> requests.sessions.Session:
+    """
+    Returns a requests session with the designated retry strategy
+    """
+    # Use a 10 minute timeout by default.
+    return http_session(name="registry", tries=retries, backoff=float(backoff), timeout=600)
 
 
 class RegistryError(Exception):
@@ -37,7 +47,12 @@ class RegistryError(Exception):
 class Registry:
     """Base class for interactions with a docker registry"""
 
-    def __init__(self, registry: str, logger: logging.Logger = logger, configfile: Optional[str] = None):
+    def __init__(
+        self,
+        registry: str,
+        logger: logging.Logger = logger,
+        configfile: Optional[str] = None,
+    ):
         self.registry_url = registry
         self.logger = logger
         self.auth = self._get_auth_token(configfile)
@@ -70,7 +85,9 @@ class Registry:
         else:
             headers["Accept"] = "application/vnd.docker.distribution.manifest.v1+json"
         url = "https://{}{}".format(self.registry_url, url_part)
-        response = requests.request(method, url, headers=headers)
+        # We experience sporadic 504 responses from the registry, in those cases, retry
+        # with an exponential backoff
+        response = requests_session().request(method, url, headers=headers)
         response.raise_for_status()
         return response
 

@@ -1,3 +1,9 @@
+docker-report (0.0.10-1) buster-wikimedia; urgency=medium
+
+  * Retry failing requests to the docker registry.
+
+ -- Giuseppe Lavagetto <glavagetto@wikimedia.org>  Mon, 04 Jan 2021 08:32:10 +0100
+
 docker-report (0.0.9-1) buster-wikimedia; urgency=medium
 
   * Use helm3 to package charts. As helm 3 is backwards compatible with
