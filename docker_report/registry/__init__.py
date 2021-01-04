@@ -25,7 +25,7 @@ from typing import Dict, List, Optional
 
 import requests
 
-from wmflib.requests import http_session  # type: ignore
+from wmflib.requests import http_session
 
 REGISTRY_PAGINATION_RE = re.compile(r"<([^>]*)>")
 
