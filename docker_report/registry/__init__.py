@@ -48,14 +48,12 @@ class Registry:
     """Base class for interactions with a docker registry"""
 
     def __init__(
-        self,
-        registry: str,
-        logger: logging.Logger = logger,
-        configfile: Optional[str] = None,
+        self, registry: str, logger: logging.Logger = logger, configfile: Optional[str] = None, protocol: str = "https"
     ):
         self.registry_url = registry
         self.logger = logger
         self.auth = self._get_auth_token(configfile)
+        self.protocol = protocol
 
     def _get_auth_token(self, filename: Optional[str] = None) -> Optional[str]:
         if filename is None:
@@ -84,7 +82,7 @@ class Registry:
             headers["Accept"] = "application/vnd.docker.distribution.manifest.v2+json"
         else:
             headers["Accept"] = "application/vnd.docker.distribution.manifest.v1+json"
-        url = "https://{}{}".format(self.registry_url, url_part)
+        url = "{}://{}{}".format(self.protocol, self.registry_url, url_part)
         # We experience sporadic 504 responses from the registry, in those cases, retry
         # with an exponential backoff
         response = requests_session().request(method, url, headers=headers)
