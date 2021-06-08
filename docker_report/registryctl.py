@@ -119,7 +119,7 @@ def delete_tags(registry_name: str, name: str, filterglob: str, force: bool = Fa
     if not force:
         to_remove = fnmatch.filter(registry.get_tags_for_image(name), filterglob)
         if len(to_remove) > 1:
-            print("We're about to delete the following tags for image {}/{}:".format(registry, name))
+            print("We're about to delete the following tags for image {}/{}:".format(registry_name, name))
             for tag in to_remove:
                 print(tag)
             resp = input("Ok to proceed? (y/n)")
@@ -128,7 +128,7 @@ def delete_tags(registry_name: str, name: str, filterglob: str, force: bool = Fa
                 return
     selected, failed = registry.delete_image(name, filterglob)
     for tag in selected:
-        fullname = "{}/{}:{}".format(registry, name, tag)
+        fullname = "{}/{}:{}".format(registry_name, name, tag)
         if tag in failed:
             res = "FAIL"
         else:
