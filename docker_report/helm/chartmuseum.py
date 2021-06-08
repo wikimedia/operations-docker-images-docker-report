@@ -83,7 +83,6 @@ class Chartmuseum:
             except requests.exceptions.HTTPError as e:
                 # Don't raise on 409
                 if e.response.status_code == 409:
-                    self.logger.info("Chart already exists: %s", tgz_path)
                     return e.response
                 self.logger.exception("Error getting data from chartmuseum: %s", e)
                 raise ChartmuseumError(url_part)
