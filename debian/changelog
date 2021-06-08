@@ -1,3 +1,12 @@
+docker-report (0.0.12-1) buster-wikimedia; urgency=medium
+
+  * Don't treat nonexisting image tags as failure on delete
+  * Remove duplicate log line from Chartmuseum class
+  * Fix output of registry on delete-tags
+  * change setuptools_scm tag regex (to properly parse "upstream/x.y.z")
+
+ -- Janis Meybohm <jmeybohm@wikimedia.org>  Tue, 08 Jun 2021 13:53:50 +0200
+
 docker-report (0.0.11-1) buster-wikimedia; urgency=medium
 
   * Allow talking to the registry over HTTP
