@@ -39,7 +39,10 @@ setup(
     packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*"]),
     platforms=["GNU/Linux"],
     setup_requires=setup_requires,
-    use_scm_version=True,
+    # In order to support tags of the form upstream/1.2.3 modify the default DEFAULT_TAG_REGEX
+    # modifying (?:[\w-]+-)? with (?:[\w-]+[-/])?
+    # See also: https://github.com/pypa/setuptools_scm/blob/main/src/setuptools_scm/config.py#L8
+    use_scm_version={"tag_regex": r"^(?:[\w-]+[-/])?(?P<version>[vV]?\d+(?:\.\d+){0,2}[^\+]*)(?:\+.*)?$"},
     zip_safe=False,
     entry_points={
         "console_scripts": [
