@@ -30,13 +30,14 @@ class RegistryOperations(Registry):
         resp = self._request("/v2/{}/manifests/{}".format(name, tag), use_v2=True)
         return resp.headers.get("Docker-Content-Digest", "")
 
-    def delete_image(self, name: str, tag_glob: str) -> Tuple[List[str], List[str]]:
+    def delete_image(self, name: str, tag_glob: str) -> Tuple[List[str], List[str], List[str]]:
         """Delete a specific tag (or tag glob) from an image.
 
         Two lists are returned, in a tuple: the list of all processed tags, and the list of tags
         that we failed to remove.
         """
         failed = []
+        not_found = []
         # let's find all the tags corresponding to the glob
         tags = self.get_tags_for_image(name)
         selected_tags = fnmatch.filter(tags, tag_glob)
@@ -45,7 +46,10 @@ class RegistryOperations(Registry):
                 digest = self._image_digest(name, tag)
                 delete_url = "/v2/{}/manifests/{}".format(name, digest)
                 self._request(delete_url, method="DELETE", use_v2=True)
-            except requests.RequestException:
-                self.logger.exception("Error deleting the image %s:%s from the registry", name, tag)
-                failed.append(tag)
-        return (selected_tags, failed)
+            except requests.RequestException as e:
+                if e.response.status_code == 404:
+                    not_found.append(tag)
+                else:
+                    self.logger.exception("Error deleting the image %s:%s from the registry", name, tag)
+                    failed.append(tag)
+        return (selected_tags, failed, not_found)

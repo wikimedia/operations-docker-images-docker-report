@@ -56,7 +56,7 @@ def test_list_tags(fake_stdout):
 @mock.patch("docker_report.registry.operations.RegistryOperations")
 def test_delete_tags_force(base_mocker):
     ops = base_mocker.return_value
-    ops.delete_image.return_value = (["foo", "foobar"], ["foobar"])
+    ops.delete_image.return_value = (["foo", "foobar"], ["foobar"], [])
     # Even if images fail, exit code is always 0 with force.
     registryctl.delete_tags("httpbin.org", "test", "foo*", True)
     assert ops.get_tags_for_image.call_count == 0
@@ -67,7 +67,7 @@ def test_delete_tags_force(base_mocker):
 def test_delete_tags(base_mocker):
     ops = base_mocker.return_value
     ops.get_tags_for_image.return_value = ["foo", "foobar", "boofar"]
-    ops.delete_image.return_value = (["foo", "foobar"], ["foobar"])
+    ops.delete_image.return_value = (["foo", "foobar"], ["foobar"], [])
     with mock.patch("builtins.input") as i:
         i.return_value = "y"
         with pytest.raises(registryctl.RegistryError):
@@ -91,7 +91,7 @@ def test_delete_tags_single(base_mocker):
     """Test deleting a single image doesn't require confirmation"""
     ops = base_mocker.return_value
     ops.get_tags_for_image.return_value = ["foo", "foobar", "boofar"]
-    ops.delete_image.return_value = (["foobar"], [])
+    ops.delete_image.return_value = (["foobar"], [], [])
     with mock.patch("builtins.input") as i:
         i.return_value = "n"
         registryctl.delete_tags("httpbin.org", "test", "*bar", False)

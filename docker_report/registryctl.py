@@ -126,11 +126,13 @@ def delete_tags(registry_name: str, name: str, filterglob: str, force: bool = Fa
             if resp.lower() != "y":
                 print("Aborting.")
                 return
-    selected, failed = registry.delete_image(name, filterglob)
+    selected, failed, not_found = registry.delete_image(name, filterglob)
     for tag in selected:
         fullname = "{}/{}:{}".format(registry_name, name, tag)
         if tag in failed:
             res = "FAIL"
+        elif tag in not_found:
+            res = "GONE"
         else:
             res = "DONE"
         print("{0:74s}[{1}]".format(fullname, res))
