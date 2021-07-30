@@ -21,9 +21,10 @@ def test_initialize():
     assert rb.auth is None
 
 
-def test_auth_token():
+@pytest.mark.parametrize("authkey", ["httpbin.org", "https://httpbin.org"])
+def test_auth_token(authkey):
     with mock.patch("json.load") as jl:
-        jl.return_value = {"auths": {"httpbin.org": {"auth": "abcd"}}}
+        jl.return_value = {"auths": {authkey: {"auth": "abcd"}}}
         # This is a trick to ensure the file is present and readable.
         filename = os.path.abspath(__file__)
         r = Registry("httpbin.org", configfile=filename)

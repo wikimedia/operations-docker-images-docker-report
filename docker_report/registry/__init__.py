@@ -61,7 +61,10 @@ class Registry:
         try:
             with open(filename, "r") as fh:
                 config = json.load(fh)
-            return config["auths"][self.registry_url]["auth"]
+            auths = config["auths"]
+            for reg in [self.registry_url, "https://{}".format(self.registry_url)]:
+                if reg in auths:
+                    return auths[reg]["auth"]
         except (KeyError, TypeError):
             # The config has nothing about our registry.
             pass
