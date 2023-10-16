@@ -15,5 +15,5 @@ def setup_logging(logger: logging.Logger, options: argparse.Namespace, level=log
     logger.setLevel(options.debug and logging.DEBUG or level)
     if not options.silent:
         ch = logging.StreamHandler()
-        ch.setFormatter(logging.Formatter("%(levelname)s[%(name)s] %(message)s"))
+        ch.setFormatter(logging.Formatter("%(asctime)s %(levelname)s[%(name)s] %(message)s"))
         logger.addHandler(ch)

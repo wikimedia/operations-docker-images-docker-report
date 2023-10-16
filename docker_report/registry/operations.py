@@ -47,7 +47,7 @@ class RegistryOperations(Registry):
                 delete_url = "/v2/{}/manifests/{}".format(name, digest)
                 self._request(delete_url, method="DELETE", use_v2=True)
             except requests.RequestException as e:
-                if e.response.status_code == 404:
+                if e.response is not None and e.response.status_code == 404:
                     not_found.append(tag)
                 else:
                     self.logger.exception("Error deleting the image %s:%s from the registry", name, tag)

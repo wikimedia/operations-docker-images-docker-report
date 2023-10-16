@@ -88,10 +88,14 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--exclude-tag-regexp", nargs="*", help="regexes for excluding tags")
     parser.add_argument("--filter-file", help="file containing filter rules")
     parser.add_argument("--keep", action="store_true", help="keep docker images after downloading them.")
+    parser.add_argument("--concurrency", type=int, default=1, help="Maximum concurrency in running debmonitor reports.")
+    parser.add_argument("--debmonitor-group", default="debmonitor", help="Name of the debmonitor POSIX group")
+    parser.add_argument(
+        "--minimum-debian-version", default=10, help="Minimum Debian major version that is considered supported."
+    )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
     log.add_argument("--silent", "-s", action="store_true", default=False, help="don't log to console")
-    parser.add_argument("--concurrency", type=int, default=1, help="Maximum concurrency in running debmonitor reports.")
     return parser.parse_args(args)
 
 
@@ -216,30 +220,31 @@ def _image(rules: configparser.SectionProxy) -> Optional[ImageFilter]:
         return name_cond
 
 
-def _tempdir() -> str:
+def _tempdir(group_name: str = "debmonitor") -> str:
     """Create a tempdir, make it writable to debmonitor."""
     tempdir = tempfile.mkdtemp("-docker-report")
-    group = grp.getgrnam("debmonitor").gr_gid
+    group = grp.getgrnam(group_name).gr_gid
     os.chown(tempdir, os.getuid(), group)
     os.chmod(tempdir, stat.S_IRWXU | stat.S_IRWXG)
     return tempdir
 
 
 class Reporter:
-    def __init__(self, browser: RegistryBrowser, tempdir: str, keep_images: bool):
+    def __init__(self, browser: RegistryBrowser, tempdir: str, keep_images: bool, minimum_major: int):
         self._browser = browser
         self.exitcode = 0
         self._tempdir = tempdir
         self._prune_images = not keep_images
         self._failed = []  # type: List[str]
         self._success = []  # type: List[str]
+        self._minimum_major = minimum_major
 
     def run_report(self, image: str):
         """Run the report on one image"""
         logger.info("Building debmonitor report for %s", image)
         try:
-            debmonitor = DockerReport(image, self._tempdir)
-            if not debmonitor.is_debian_image():
+            debmonitor = DockerReport(image, self._tempdir, self._minimum_major)
+            if not debmonitor.is_supported_image():
                 logger.warning("Unable to create a report for non debian images")
                 return
 
@@ -282,9 +287,9 @@ def main(args=None):
     options = parse_args(args)
     setup_logging(logger, options)
     try:
-        tempdir = _tempdir()
+        tempdir = _tempdir(options.debmonitor_group)
         registry = setup_browser(options)
-        report = Reporter(registry, tempdir, options.keep)
+        report = Reporter(registry, tempdir, options.keep, options.minimum_debian_version)
         with ThreadPoolExecutor(max_workers=options.concurrency) as executor:
             for _ in executor.map(report.run_report, report.get_images()):
                 # Do nothing here, just catch exceptions.

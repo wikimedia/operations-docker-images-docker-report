@@ -1,3 +1,10 @@
+docker-report (0.0.14-1) bullseye-wikimedia; urgency=medium
+
+  * Add --minimum-debian-version flag to filter unsupported images
+  * Bug: T348876
+
+ -- Janis Meybohm <jmeybohm@wikimedia.org>  Mon, 16 Oct 2023 15:16:31 +0200
+
 docker-report (0.0.13-1) buster-wikimedia; urgency=medium
 
   * Bugfix: accept full schema in the configuration file when fetching credentials.

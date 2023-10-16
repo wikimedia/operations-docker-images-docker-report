@@ -51,6 +51,7 @@ class RegistryBrowser(Registry):
             images_in_resp = resp.get("repositories", [])
             # Only select images that pass all the filters
             selected_images = [img for img in images_in_resp if all(fn(img) for fn in self.name_filters)]
+            self.logger.debug("selected %d out of %d images", len(selected_images), len(images_in_resp))
             images.extend(selected_images)
 
         return images

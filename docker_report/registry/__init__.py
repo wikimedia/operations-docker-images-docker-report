@@ -98,6 +98,7 @@ class Registry:
         try:
             while True:
                 # If this fails, an exception is raised.
+                self.logger.debug("Fetching: %s", url_part)
                 resp = self._request(url_part)
                 responses.append(resp.json())
                 if "next" not in resp.links:

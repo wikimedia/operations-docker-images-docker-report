@@ -27,7 +27,7 @@ def browser(request) -> RegistryBrowser:
 def rep() -> reporter.Reporter:
     br = mock.MagicMock()
     br.registry_url = "example.org"
-    return reporter.Reporter(br, "/tmp", False)
+    return reporter.Reporter(br, "/tmp", False, 10)
 
 
 def test_args_basic():
@@ -196,7 +196,7 @@ def test_reporter_init(rep):
 @mock.patch("docker_report.reporter.DockerReport")
 def test_run_report(dr, rep):
     rep.run_report("example.org/test:latest")
-    dr.assert_called_with("example.org/test:latest", "/tmp")
+    dr.assert_called_with("example.org/test:latest", "/tmp", 10)
     debmonitor = dr.return_value
     debmonitor.generate_report.assert_called_with()
     debmonitor.submit_report.assert_called_with()
