@@ -245,7 +245,7 @@ class Reporter:
         try:
             debmonitor = DockerReport(image, self._tempdir, self._minimum_major)
             if not debmonitor.is_supported_image():
-                logger.warning("Unable to create a report for non debian images")
+                logger.warning("Unable to create a report for %s. The image is not supported.", image)
                 return
 
             debmonitor.generate_report()
