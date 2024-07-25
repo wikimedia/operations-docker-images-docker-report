@@ -1,3 +1,9 @@
+docker-report (0.0.15-1) bullseye-wikimedia; urgency=medium
+
+  * Fix warning log to reflect that a minimum Debian version is checked.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Thu, 25 Jul 2024 12:18:00 +0200
+
 docker-report (0.0.14-1) bullseye-wikimedia; urgency=medium
 
   * Add --minimum-debian-version flag to filter unsupported images
