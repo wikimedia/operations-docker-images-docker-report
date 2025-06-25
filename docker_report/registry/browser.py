@@ -19,28 +19,18 @@
 import json
 
 from datetime import datetime
-from typing import Callable, Dict, List, Tuple
+from typing import Dict, List, Generator
 
 from docker_report.registry import Registry, RegistryError
-
-# Functions that can act as a filter should accept the image name without tag as an input,
-# and return True if the image is admissible.
-ImageFilter = Callable[[str], bool]
-# For tags, they should accept the image name and tag as arguments, in a tuple.
-TagFilter = Callable[[Tuple[str, str]], bool]
+from docker_report.browser import Browser
 
 
 class RegistryBrowserError(RegistryError):
     """Specific exception for the registry browser."""
 
 
-class RegistryBrowser(Registry):
+class RegistryBrowser(Registry, Browser):
     """Allows to browse the catalog of a standard docker registry"""
-
-    # Filters on the image names.
-    name_filters = []  # type: List[ImageFilter]
-    # Filters on image full names.
-    tag_filters = []  # type: List[TagFilter]
 
     def _get_images_list(self) -> List[str]:
         """Gets a list of images, filtered via a list of functions."""
@@ -55,6 +45,12 @@ class RegistryBrowser(Registry):
             images.extend(selected_images)
 
         return images
+
+    def get_images(self) -> Generator[str, None, None]:
+        """Gets all the image names, as a generator."""
+        for name, tags in self.get_image_tags(sort=True).items():
+            tag = tags[-1]
+            yield self._image_full_name(name, tag)
 
     def get_image_tags(self, sort=False) -> Dict[str, List[str]]:
         """Get a dict of image data in the form image_name: tags."""
@@ -93,3 +89,7 @@ class RegistryBrowser(Registry):
                 raise RegistryBrowserError("Could not sort {}".format(image))
 
         return sorted(tags, key=get_tag_date)
+
+    def _image_full_name(self, name: str, tag: str) -> str:
+        """Fully qualified name of the image"""
+        return "{}/{}:{}".format(self.registry_url, name, tag)

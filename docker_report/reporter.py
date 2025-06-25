@@ -17,11 +17,13 @@
 """
 Docker reporter utility.
 
-This program browses the content of a docker registry, filters out images and tags based on rules (see below),
+This program gets a list of Docker images from a registry or from the live containers
+running in a Kubernetes cluster, it filters out images and tags based on rules (see below),
 and performs some actions. Right now, it only reports the installed packages to debmonitor.
 
-It's important to note that for each image, only the *last* tag will be considered and reported upon, with the idea
-that older versions should be by now unused.
+When fetching from a registry, it is important to know that only the *last* tag
+will be considered and reported upon, with the idea that older versions
+should be by now unused.
 
 Image selection filtering
 -------------------------
@@ -67,21 +69,29 @@ import stat
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from typing import Generator, List, Optional, Tuple
+from typing import Generator, List, Optional, Tuple, Union
 
 from docker_report import CustomFormatter, setup_logging
+from docker_report.browser import Browser, ImageFilter, TagFilter
 from docker_report.debmonitor import DockerReport, DockerReportError
+from docker_report.k8s.browser import KubernetesBrowser
+from docker_report.registry.browser import RegistryBrowser
 from docker_report.registry import RegistryError
-from docker_report.registry.browser import ImageFilter, RegistryBrowser, TagFilter
 
-logger = logging.getLogger("docker-report")
+logger = logging.getLogger("docker_report")
 
 
 def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     """Parse arguments."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=CustomFormatter)
+    browser = parser.add_mutually_exclusive_group(required=True)
+    browser.add_argument(
+        "--registry", metavar="REGISTRY_NAME", help="The url (without scheme) of the docker registry to scan"
+    )
+    browser.add_argument("--k8s-cluster", metavar="K8s_CLUSTER_NAME", help="The name of the target K8s cluster.")
     parser.add_argument(
-        "registry", metavar="REGISTRY_NAME", help="The url (without scheme) of the docker registry to scan"
+        "--k8s-kubeconfig-path",
+        help="The filepath of the kubeconfig file to use. If not set, the KUBECONFIG env var " "will be used instead.",
     )
     parser.add_argument("--exclude-namespaces", nargs="*", help="namespaces to exclude from the run")
     parser.add_argument("--no-exclude-naked", action="store_true", help="include also 'naked' tags (i.e. sha1s)")
@@ -91,17 +101,31 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument("--concurrency", type=int, default=1, help="Maximum concurrency in running debmonitor reports.")
     parser.add_argument("--debmonitor-group", default="debmonitor", help="Name of the debmonitor POSIX group")
     parser.add_argument(
-        "--minimum-debian-version", default=10, help="Minimum Debian major version that is considered supported."
+        "--minimum-debian-version",
+        default=10,
+        type=int,
+        help="Minimum Debian major version that is considered supported.",
     )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
     log.add_argument("--silent", "-s", action="store_true", default=False, help="don't log to console")
-    return parser.parse_args(args)
+    parsed_args = parser.parse_args(args)
+
+    if parsed_args.k8s_cluster and not parsed_args.k8s_kubeconfig_path and "KUBECONFIG" not in os.environ:
+        raise RuntimeError(
+            "Please either provide a kubeconfig path or set a meaningful " "KUBECONFIG environment variable."
+        )
+    return parsed_args
 
 
-def setup_browser(options: argparse.Namespace) -> RegistryBrowser:
+def setup_browser(options: argparse.Namespace) -> Browser:
     """Sets up the repo browser with all filters."""
-    br = RegistryBrowser(options.registry, logger=logger)
+
+    if options.registry:
+        br: Union[RegistryBrowser, KubernetesBrowser] = RegistryBrowser(options.registry, logger=logger)
+    else:
+        br = KubernetesBrowser(options.k8s_cluster, options.k8s_kubeconfig_path)
+
     if options.exclude_namespaces:
 
         def exclude_namespaces(name):
@@ -230,7 +254,7 @@ def _tempdir(group_name: str = "debmonitor") -> str:
 
 
 class Reporter:
-    def __init__(self, browser: RegistryBrowser, tempdir: str, keep_images: bool, minimum_major: int):
+    def __init__(self, browser: Browser, tempdir: str, keep_images: bool, minimum_major: int):
         self._browser = browser
         self.exitcode = 0
         self._tempdir = tempdir
@@ -238,6 +262,14 @@ class Reporter:
         self._failed = []  # type: List[str]
         self._success = []  # type: List[str]
         self._minimum_major = minimum_major
+
+    def get_images(self) -> Union[Generator[str, None, None], List]:
+        """Gets all the image names, as a generator."""
+        try:
+            return self._browser.get_images()
+        except RegistryError:
+            self.exitcode = 2
+            return []
 
     def run_report(self, image: str):
         """Run the report on one image"""
@@ -257,26 +289,17 @@ class Reporter:
             self._failed.append(image)
             logger.error("Debmonitor report for image %s failed", image)
             self.exitcode = 3
-
-    def _image_full_name(self, name: str, tag: str) -> str:
-        """Fully qualified name of the image"""
-        return "{}/{}:{}".format(self._browser.registry_url, name, tag)
-
-    def get_images(self) -> Generator[str, None, None]:
-        """Gets all the image names, as a generator."""
-        try:
-            for name, tags in self._browser.get_image_tags(sort=True).items():
-                tag = tags[-1]
-                yield self._image_full_name(name, tag)
-        except RegistryError:
-            self.exitcode = 2
+        except Exception:
+            self._failed.append(image)
+            logger.exception("Debmonitor report for image %s failed", image)
+            self.exitcode = 3
 
     def pprint(self):
         """Pretty-prints results"""
         if not self._failed:
             print("All images submitted correctly!")
         print("")
-        print("Detailer results:")
+        print("Detailed results:")
         for img in self._success:
             print("%-70s[OK]" % img)
         for img in self._failed:
@@ -288,13 +311,18 @@ def main(args=None):
     setup_logging(logger, options)
     try:
         tempdir = _tempdir(options.debmonitor_group)
-        registry = setup_browser(options)
-        report = Reporter(registry, tempdir, options.keep, options.minimum_debian_version)
+        browser = setup_browser(options)
+        report = Reporter(browser, tempdir, options.keep, options.minimum_debian_version)
         with ThreadPoolExecutor(max_workers=options.concurrency) as executor:
             for _ in executor.map(report.run_report, report.get_images()):
                 # Do nothing here, just catch exceptions.
                 pass
         report.pprint()
+
+        if options.k8s_cluster:
+            logger.info("Submitting report for the Kubernetes cluster %s to Debmonitor", options.k8s_cluster)
+            browser.submit_report()
+
     except Exception:
         logger.exception("Unexpected error during execution")
         report.exitcode = 1

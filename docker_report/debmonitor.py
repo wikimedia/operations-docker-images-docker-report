@@ -46,7 +46,10 @@ def parse_args(args: List[str]) -> argparse.Namespace:
     parser.add_argument("--keep", action="store_true", help="Keep the generated report even after submitting it.")
     parser.add_argument("--no-submit", "-n", action="store_true", help="Do not submit the report, just generate it.")
     parser.add_argument(
-        "--minimum-debian-version", default=10, help="Minimum Debian major version that is considered supported."
+        "--minimum-debian-version",
+        default=10,
+        type=int,
+        help="Minimum Debian major version that is considered supported.",
     )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")

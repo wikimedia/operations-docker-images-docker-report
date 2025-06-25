@@ -8,6 +8,7 @@ from unittest import mock
 import pytest
 
 from docker_report import reporter
+from docker_report import registry
 from docker_report.registry.browser import RegistryBrowser
 
 
@@ -16,7 +17,7 @@ def browser(request) -> RegistryBrowser:
     RegistryBrowser.tag_filters = []
     RegistryBrowser.name_filters = []
     if not hasattr(request, "param"):
-        opts = reporter.parse_args(["httpbin.org"])
+        opts = reporter.parse_args(["--registry", "httpbin.org"])
     else:
         opts = reporter.parse_args(request.param)
     br = reporter.setup_browser(opts)
@@ -32,7 +33,7 @@ def rep() -> reporter.Reporter:
 
 def test_args_basic():
     """Test a basic invokation creates the right flags"""
-    opts = reporter.parse_args(["httpbin.org"])
+    opts = reporter.parse_args(["--registry", "httpbin.org"])
     assert opts.registry == "httpbin.org"
     assert opts.keep is False
     assert opts.exclude_namespaces is None
@@ -43,12 +44,12 @@ def test_args_basic():
 
 def test_args_complex():
     """Test an invokation with namespaces to exclude."""
-    opts = reporter.parse_args(["--exclude-namespaces", "debug", "pinkunicorn", "--", "httpbin.org"])
+    opts = reporter.parse_args(["--exclude-namespaces", "debug", "pinkunicorn", "--registry", "httpbin.org"])
     assert opts.exclude_namespaces == ["debug", "pinkunicorn"]
 
 
 @pytest.mark.parametrize(
-    "browser", [["--exclude-namespaces", "debug", "pinkunicorn", "--", "httpbin.org"]], indirect=True
+    "browser", [["--exclude-namespaces", "debug", "pinkunicorn", "--registry", "httpbin.org"]], indirect=True
 )
 def test_setup_exclude_ns(browser):
     assert len(browser.name_filters) == 1
@@ -61,7 +62,7 @@ def test_setup_exclude_ns(browser):
 
 
 @pytest.mark.parametrize(
-    "browser", [["--exclude-tag-regexp", "latest", "--no-exclude-naked", "httpbin.org"]], indirect=True
+    "browser", [["--exclude-tag-regexp", "latest", "--no-exclude-naked", "--registry", "httpbin.org"]], indirect=True
 )
 def test_setup_tag_regexp_allow_sha1(browser):
     """Test basic setup of a browser, with tag regexes."""
@@ -75,7 +76,7 @@ def test_setup_filters_from_file(mocker):
     mocker.return_value = ([lambda x: "foo/" not in x], [lambda data: data[1] != "latest"])
     RegistryBrowser.tag_filters = []
     RegistryBrowser.name_filters = []
-    opts = reporter.parse_args(["--filter-file", "test.ini", "httpbin.org"])
+    opts = reporter.parse_args(["--filter-file", "test.ini", "--registry", "httpbin.org"])
     br = reporter.setup_browser(opts)
     mocker.assert_called_with("test.ini")
     assert len(br.tag_filters) == 2
@@ -219,15 +220,17 @@ def test_run_report_exception(dr, rep):
 
 
 def test_get_images(rep):
-    rep._browser.get_image_tags.return_value = {"test": ["1", "3", "latest"]}
+    rep._browser.get_images.return_value = iter(["example.org/test:latest"])
     assert list(rep.get_images()) == ["example.org/test:latest"]
     assert rep.exitcode == 0
+    rep._browser.get_images.assert_called_once_with()
 
 
 def test_get_images_error(rep):
-    rep._browser.get_image_tags.side_effect = reporter.RegistryError("fail!")
+    rep._browser.get_images.side_effect = registry.RegistryError("fail!")
     assert list(rep.get_images()) == []
     assert rep.exitcode == 2
+    rep._browser.get_images.assert_called_once_with()
 
 
 @mock.patch("sys.stdout", new_callable=io.StringIO)
@@ -254,7 +257,7 @@ def test_main_happy_path(rep):
         # This file will be removed
         td.return_value = tempfile.mkdtemp()
         with pytest.raises(SystemExit):
-            reporter.main(["example.org"])
+            reporter.main(["--registry", "example.org"])
     assert not os.path.isdir(td.return_value)
     assert instance.run_report.call_count == 2
     instance.run_report.assert_called_with("example.org/test:latest")
@@ -269,7 +272,7 @@ def test_main_exception(rep):
         # This file will be removed
         td.return_value = tempfile.mkdtemp()
         with pytest.raises(SystemExit) as exc_info:
-            reporter.main(["example.org"])
+            reporter.main(["--registry", "example.org"])
     assert not os.path.isdir(td.return_value)
     assert instance.run_report.call_count == 1
     assert exc_info.value.code == 1
