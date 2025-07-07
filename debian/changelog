@@ -1,3 +1,12 @@
+docker-report (0.0.16-1) bookworm-wikimedia; urgency=medium
+
+  * Add support to fetch image running as containers on Kubernetes.
+  * Update target distribution to Bookworm.
+  * Add dependency to python3-kubernetes.
+  * Bump compat to 12.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Mon, 07 Jul 2025 12:30:00 +0100
+
 docker-report (0.0.15-1) bullseye-wikimedia; urgency=medium
 
   * Fix warning log to reflect that a minimum Debian version is checked.
