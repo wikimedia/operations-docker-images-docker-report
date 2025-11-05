@@ -109,7 +109,15 @@ class KubernetesBrowser(Browser):
             if self.debmonitor_api.is_image_in_debmonitor(image_name):
                 logger.debug("Skipping push of image %s to Debmonitor, already present", image_name)
                 continue
-            yield image_name
+            # Name filters do not take into account the docker registry's URL and the tag
+            docker_url_len = image_name.find("/") + 1
+            image_name_without_url_tag = image_name[docker_url_len:].split(":")[0]
+            if all(fn(image_name_without_url_tag) for fn in self.name_filters):
+                yield image_name
+            else:
+                logger.debug(
+                    "Image %s skipped because filtered out (matched name %s).", image_name, image_name_without_url_tag
+                )
 
     def get_running_images(self) -> dict:
         if not self._running_images:

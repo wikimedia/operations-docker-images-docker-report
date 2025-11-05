@@ -59,3 +59,38 @@ def test_get_images_missing(rep):
         assert list(rep.get_images()) == ["image-something:tag1", "image-bla:tag13"]
 
     assert rep.exitcode == 0
+
+
+def test_get_images_filtered(rep):
+    def nofoobar(name):
+        return name != "foo/bar"
+
+    def nons(name):
+        return name[0] != "/"
+
+    rep._browser.name_filters = [nofoobar, nons]
+    rep._browser.get_running_images = mock.MagicMock()
+    fake_image1 = "docker-registry.discovery.wmnet/batman/robin:tag1"
+    fake_image2 = "docker-registry.discovery.wmnet/foo/bar:tag13"
+    rep._browser.get_running_images.return_value = {
+        "cluster": "test-cluster",
+        "images": {
+            fake_image1: {"namespace1": 3, "namespace4": 100},
+            fake_image2: {"namespace13": 3, "namespace43": 100},
+        },
+    }
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"https://debmonitor.example.com/images/{fake_image1}",
+            json={"name": fake_image1},
+        )
+        m.get(
+            f"https://debmonitor.example.com/images/{fake_image2}",
+            json={"name": fake_image2},
+        )
+        assert list(rep.get_images()) == []
+
+    with requests_mock.Mocker() as m:
+        m.get(f"https://debmonitor.example.com/images/{fake_image1}", status_code=404)
+        m.get(f"https://debmonitor.example.com/images/{fake_image2}", status_code=404)
+        assert list(rep.get_images()) == [fake_image1]
