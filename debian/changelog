@@ -1,3 +1,9 @@
+docker-report (0.0.17-1) bookworm-wikimedia; urgency=medium
+
+  * Add support to filter k8s images by name.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Tue, 11 Nov 2025 06:20:00 +0100
+
 docker-report (0.0.16-1) bookworm-wikimedia; urgency=medium
 
   * Add support to fetch image running as containers on Kubernetes.
