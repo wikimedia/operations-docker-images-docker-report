@@ -80,7 +80,8 @@ def test_docker_cmd(report):
     assert "/tmp:/mnt:rw" in res
     bash = res[-1].split(" && ")
     assert (
-        "/usr/bin/debmonitor-client -n -i 'docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1' > "
+        "unset PYTHONPATH; /usr/bin/debmonitor-client -n -i "
+        "'docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1' > "
         "'/mnt/docker-registry.wikimedia.org-envoy-tls-local-proxy:1.12.2-1.debmonitor.json'" in bash
     )
 
