@@ -1,12 +1,12 @@
 from pathlib import Path
 
-import cgi
 import pytest
 import requests_mock
-from io import BytesIO
 from unittest import mock
 from base64 import b64encode
-
+from email.parser import BytesParser
+from email.policy import default
+from typing import Optional
 
 from docker_report.helm.chartmuseum import Chartmuseum, ChartmuseumError
 
@@ -118,6 +118,28 @@ def test_get_chart_versions(chartmuseum, req_mock):
             assert t.get("name") == "blubberoid"
 
 
+def parse_multipart_body(request: requests_mock.request._RequestObjectProxy, section_name: str) -> Optional[str]:
+    # Simulated inputs (like your last_req)
+    body = request.body  # raw bytes
+    headers = request.headers
+
+    # Build a full message (headers + body) for the parser
+    raw_message = b""
+    for key, value in headers.items():
+        raw_message += f"{key}: {value}\r\n".encode("utf-8")
+    raw_message += b"\r\n"  # blank line separates headers from body
+    raw_message += body
+
+    # Parse the multipart message
+    msg = BytesParser(policy=default).parsebytes(raw_message)
+
+    if msg.is_multipart():
+        for part in msg.iter_parts():
+            content_disposition = part.get("Content-Disposition", "")
+            if f'name="{section_name}"' in content_disposition:
+                return part.get_content()
+
+
 @mock.patch.object(Path, "open", new_callable=mock.mock_open, read_data=b"aa\nbb")
 def test_upload_chart(open_mock, chartmuseum, req_mock):
     with req_mock as r_mock:
@@ -128,9 +150,8 @@ def test_upload_chart(open_mock, chartmuseum, req_mock):
 
         # Ensure the correct form field is used
         last_req = r_mock.last_request
-        fs = cgi.FieldStorage(fp=BytesIO(last_req.body), headers=last_req.headers, environ={"REQUEST_METHOD": "POST"})
-        item = fs["chart"]
-        assert item.value == b"aa\nbb"
+        chart_item = parse_multipart_body(request=last_req, section_name="chart")
+        assert chart_item == "aa\nbb"
 
         # Next upload should cause a 409 but should not raise
         r_mock.post(
