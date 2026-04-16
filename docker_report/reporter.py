@@ -58,6 +58,7 @@ Filter rules are in one of the following formats:
 * regex:<some-regex-here> A regular expression to test the entity against
 * contains:<some-text-here> Checks if the given substring is present in the entity
 """
+
 import argparse
 import configparser
 import grp
@@ -86,20 +87,39 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=CustomFormatter)
     browser = parser.add_mutually_exclusive_group(required=True)
     browser.add_argument(
-        "--registry", metavar="REGISTRY_NAME", help="The url (without scheme) of the docker registry to scan"
+        "--registry",
+        metavar="REGISTRY_NAME",
+        help="The url (without scheme) of the docker registry to scan",
     )
-    browser.add_argument("--k8s-cluster", metavar="K8s_CLUSTER_NAME", help="The name of the target K8s cluster.")
+    browser.add_argument(
+        "--k8s-cluster",
+        metavar="K8s_CLUSTER_NAME",
+        help="The name of the target K8s cluster.",
+    )
     parser.add_argument(
         "--k8s-kubeconfig-path",
         help="The filepath of the kubeconfig file to use. If not set, the KUBECONFIG env var " "will be used instead.",
     )
     parser.add_argument("--exclude-namespaces", nargs="*", help="namespaces to exclude from the run")
-    parser.add_argument("--no-exclude-naked", action="store_true", help="include also 'naked' tags (i.e. sha1s)")
+    parser.add_argument(
+        "--no-exclude-naked",
+        action="store_true",
+        help="include also 'naked' tags (i.e. sha1s)",
+    )
     parser.add_argument("--exclude-tag-regexp", nargs="*", help="regexes for excluding tags")
     parser.add_argument("--filter-file", help="file containing filter rules")
     parser.add_argument("--keep", action="store_true", help="keep docker images after downloading them.")
-    parser.add_argument("--concurrency", type=int, default=1, help="Maximum concurrency in running debmonitor reports.")
-    parser.add_argument("--debmonitor-group", default="debmonitor", help="Name of the debmonitor POSIX group")
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Maximum concurrency in running debmonitor reports.",
+    )
+    parser.add_argument(
+        "--debmonitor-group",
+        default="debmonitor",
+        help="Name of the debmonitor POSIX group",
+    )
     parser.add_argument(
         "--minimum-debian-version",
         default=10,
@@ -108,7 +128,13 @@ def parse_args(args: Optional[List[str]] = None) -> argparse.Namespace:
     )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
-    log.add_argument("--silent", "-s", action="store_true", default=False, help="don't log to console")
+    log.add_argument(
+        "--silent",
+        "-s",
+        action="store_true",
+        default=False,
+        help="don't log to console",
+    )
     parsed_args = parser.parse_args(args)
 
     if parsed_args.k8s_cluster and not parsed_args.k8s_kubeconfig_path and "KUBECONFIG" not in os.environ:
@@ -277,7 +303,10 @@ class Reporter:
         try:
             debmonitor = DockerReport(image, self._tempdir, self._minimum_major)
             if not debmonitor.is_supported_image():
-                logger.warning("Unable to create a report for %s. The image is not supported.", image)
+                logger.warning(
+                    "Unable to create a report for %s. The image is not supported.",
+                    image,
+                )
                 return
 
             debmonitor.generate_report()
@@ -320,7 +349,10 @@ def main(args=None):
         report.pprint()
 
         if options.k8s_cluster:
-            logger.info("Submitting report for the Kubernetes cluster %s to Debmonitor", options.k8s_cluster)
+            logger.info(
+                "Submitting report for the Kubernetes cluster %s to Debmonitor",
+                options.k8s_cluster,
+            )
             browser.submit_report()
 
     except Exception:

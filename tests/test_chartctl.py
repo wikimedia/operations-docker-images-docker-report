@@ -17,7 +17,16 @@ def test_parse_args_push():
 
 
 def test_parse_args_walk():
-    options = chartctl.parse_args(["--debug", "--cm-url", "https://httpbin.org/foo", "walk", "/tmp/foo", "nowhere"])
+    options = chartctl.parse_args(
+        [
+            "--debug",
+            "--cm-url",
+            "https://httpbin.org/foo",
+            "walk",
+            "/tmp/foo",
+            "nowhere",
+        ]
+    )
     assert options.silent is False
     assert options.debug is True
     assert options.action == "walk"

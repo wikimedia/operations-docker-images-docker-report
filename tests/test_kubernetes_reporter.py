@@ -37,8 +37,14 @@ def test_get_images_existing(rep):
         },
     }
     with requests_mock.Mocker() as m:
-        m.get("https://debmonitor.example.com/images/image-something:tag1", json={"name": "image-something:tag1"})
-        m.get("https://debmonitor.example.com/images/image-bla:tag13", json={"name": "image-bla:tag13"})
+        m.get(
+            "https://debmonitor.example.com/images/image-something:tag1",
+            json={"name": "image-something:tag1"},
+        )
+        m.get(
+            "https://debmonitor.example.com/images/image-bla:tag13",
+            json={"name": "image-bla:tag13"},
+        )
         assert list(rep.get_images()) == []
 
     assert rep.exitcode == 0
@@ -54,7 +60,10 @@ def test_get_images_missing(rep):
         },
     }
     with requests_mock.Mocker() as m:
-        m.get("https://debmonitor.example.com/images/image-something:tag1", status_code=404)
+        m.get(
+            "https://debmonitor.example.com/images/image-something:tag1",
+            status_code=404,
+        )
         m.get("https://debmonitor.example.com/images/image-bla:tag13", status_code=404)
         assert list(rep.get_images()) == ["image-something:tag1", "image-bla:tag13"]
 

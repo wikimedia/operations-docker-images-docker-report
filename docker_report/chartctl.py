@@ -20,6 +20,7 @@ Helm Chart to Chartmuseum CLI
 
 This program packages helm charts and pushes them to ChartMuseum.
 """
+
 import argparse
 import logging
 import os
@@ -73,7 +74,13 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
 
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
-    log.add_argument("--silent", "-s", action="store_true", default=False, help="don't log to console")
+    log.add_argument(
+        "--silent",
+        "-s",
+        action="store_true",
+        default=False,
+        help="don't log to console",
+    )
     options = parser.parse_args(args)
 
     return options

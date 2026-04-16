@@ -1,11 +1,12 @@
 from pathlib import Path
 
-import pytest
 import cgi
+import pytest
 import requests_mock
+from io import BytesIO
 from unittest import mock
 from base64 import b64encode
-from io import BytesIO
+
 
 from docker_report.helm.chartmuseum import Chartmuseum, ChartmuseumError
 
@@ -73,10 +74,17 @@ def req_mock() -> requests_mock.Mocker:
     m.get("https://httpbin.org/api/bar/charts", json={})
 
     # Create an existing repo with charts
-    m.get("https://httpbin.org/api/foo/charts", json={"blubberoid": blubberoid, "raw": raw})
+    m.get(
+        "https://httpbin.org/api/foo/charts",
+        json={"blubberoid": blubberoid, "raw": raw},
+    )
     m.get("https://httpbin.org/api/foo/charts/blubberoid", json=blubberoid)
     m.get("https://httpbin.org/api/foo/charts/raw", json=raw)
-    m.get("https://httpbin.org/api/foo/charts/nonexistent", status_code=404, json=err_chartnotfound)
+    m.get(
+        "https://httpbin.org/api/foo/charts/nonexistent",
+        status_code=404,
+        json=err_chartnotfound,
+    )
 
     m.post("https://httpbin.org/api/baz/charts", status_code=201, json={"saved": True})
     return m
@@ -126,7 +134,9 @@ def test_upload_chart(open_mock, chartmuseum, req_mock):
 
         # Next upload should cause a 409 but should not raise
         r_mock.post(
-            "https://httpbin.org/api/baz/charts", status_code=409, json={"error": "baz/chart-0.0.1 already exists"}
+            "https://httpbin.org/api/baz/charts",
+            status_code=409,
+            json={"error": "baz/chart-0.0.1 already exists"},
         )
         res = chartmuseum.upload_chart("baz", Path("some/chart-0.0.1.tgz"))
         assert res.status_code == 409
@@ -135,7 +145,11 @@ def test_upload_chart(open_mock, chartmuseum, req_mock):
         chartmuseum.username = "u"
         chartmuseum.password = "p"
         encoded_auth = b64encode(b"u:p").decode("ascii")
-        r_mock.post("https://httpbin.org/api/baz/charts", status_code=401, json={"error": "unauthorized"})
+        r_mock.post(
+            "https://httpbin.org/api/baz/charts",
+            status_code=401,
+            json={"error": "unauthorized"},
+        )
         with pytest.raises(ChartmuseumError):
             chartmuseum.upload_chart("baz", Path("some/chart-0.0.1.tgz"))
             assert r_mock.last_request.headers["Authorization"] == "Basic " + encoded_auth

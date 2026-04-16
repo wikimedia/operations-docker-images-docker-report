@@ -26,7 +26,10 @@ tillerVersion: ">=2.8"
 
 @mock.patch.object(Path, "open", new_callable=mock.mock_open, read_data=chart_yaml_data)
 def test_get_chart_name_version(open_mock):
-    assert helm.get_chart_name_version(Path("foo/path/Chart.yaml")) == ("blubberoid", "0.0.26")
+    assert helm.get_chart_name_version(Path("foo/path/Chart.yaml")) == (
+        "blubberoid",
+        "0.0.26",
+    )
     open_mock.assert_called_once_with()
 
 

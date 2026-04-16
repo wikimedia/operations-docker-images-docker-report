@@ -106,7 +106,13 @@ def test_prune_image(report):
     report._cmd = mock.MagicMock()
     report.prune_image()
     report._cmd.assert_called_with(
-        "Image pruning", ["docker", "rmi", "-f", "docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1"]
+        "Image pruning",
+        [
+            "docker",
+            "rmi",
+            "-f",
+            "docker-registry.wikimedia.org/envoy-tls-local-proxy:1.12.2-1",
+        ],
     )
 
 
@@ -156,7 +162,9 @@ def test_is_supported_image_pull_error(report):
     report.client.images.pull.side_effect = docker_errors.NotFound("whatever")
     assert report.is_supported_image() is False
     debmonitor.logger.error.assert_called_with(
-        "Failed to pull/create image %s: %s", report.image, report.client.images.pull.side_effect
+        "Failed to pull/create image %s: %s",
+        report.image,
+        report.client.images.pull.side_effect,
     )
 
 
@@ -165,7 +173,9 @@ def test_is_supported_image_create_error(report):
     report.client.containers.create.side_effect = docker_errors.NotFound("whatever")
     assert report.is_supported_image() is False
     debmonitor.logger.error.assert_called_with(
-        "Failed to pull/create image %s: %s", report.image, report.client.containers.create.side_effect
+        "Failed to pull/create image %s: %s",
+        report.image,
+        report.client.containers.create.side_effect,
     )
 
 

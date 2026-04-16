@@ -23,6 +23,7 @@ This program allows to perform a series of actions on a registry:
 * List tags for a given image
 * Delete a specific version of an image.
 """
+
 import argparse
 import fnmatch
 import logging
@@ -44,7 +45,9 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
     list_images = actions.add_parser("list-images")
     list_images.add_argument("--select", default="*", help="select a filter of images to show (glob syntax)")
     list_images.add_argument(
-        "registry", metavar="REGISTRY_NAME", help="The url (without scheme) of the docker registry to scan"
+        "registry",
+        metavar="REGISTRY_NAME",
+        help="The url (without scheme) of the docker registry to scan",
     )
     list_tags = actions.add_parser("list-tags")
     list_tags.add_argument(
@@ -60,10 +63,21 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         help="The name (including the registry url) of the image. "
         "The tags to remove can be indicated as a glob pattern, or not at all.",
     )
-    delete_tags.add_argument("--force", "-f", action="store_true", help="Do not ask for confirmation of the deletion.")
+    delete_tags.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Do not ask for confirmation of the deletion.",
+    )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
-    log.add_argument("--silent", "-s", action="store_true", default=False, help="don't log to console")
+    log.add_argument(
+        "--silent",
+        "-s",
+        action="store_true",
+        default=False,
+        help="don't log to console",
+    )
     options = parser.parse_args(args)
     # Separate registry, image name and tag glob
     if options.action in ["list-tags", "delete-tags"]:

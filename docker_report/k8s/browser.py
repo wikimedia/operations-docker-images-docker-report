@@ -26,7 +26,6 @@ from wmflib.requests import http_session
 
 from docker_report.browser import Browser
 
-
 logger = logging.getLogger(__name__)
 DEBMONITOR_CONFIG_FILE = "/etc/debmonitor.conf"
 
@@ -75,7 +74,9 @@ class DebmonitorAPI:
         for server in self.servers:
             logger.info("Sending a report to %s", server)
             response = self.long_timeout_session.post(
-                f"https://{server}/kubernetes/update", json=report, **self.client_tls_config
+                f"https://{server}/kubernetes/update",
+                json=report,
+                **self.client_tls_config,
             )
 
             if response.status_code not in [201, 202]:
@@ -107,7 +108,10 @@ class KubernetesBrowser(Browser):
         """Gets all the image names, as a generator."""
         for image_name in self.get_running_images()["images"].keys():
             if self.debmonitor_api.is_image_in_debmonitor(image_name):
-                logger.debug("Skipping push of image %s to Debmonitor, already present", image_name)
+                logger.debug(
+                    "Skipping push of image %s to Debmonitor, already present",
+                    image_name,
+                )
                 continue
             # Name filters do not take into account the docker registry's URL and the tag
             docker_url_len = image_name.find("/") + 1
@@ -116,7 +120,9 @@ class KubernetesBrowser(Browser):
                 yield image_name
             else:
                 logger.debug(
-                    "Image %s skipped because filtered out (matched name %s).", image_name, image_name_without_url_tag
+                    "Image %s skipped because filtered out (matched name %s).",
+                    image_name,
+                    image_name_without_url_tag,
                 )
 
     def get_running_images(self) -> dict:

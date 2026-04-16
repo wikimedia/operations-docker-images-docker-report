@@ -63,7 +63,11 @@ def test_request_auth(registry):
     registry.auth = "abcd"
     with requests_mock.Mocker() as m:
         m.get("https://httpbin.org/v2/_catalog", headers={}, text="fail")
-        m.get("https://httpbin.org/v2/_catalog", headers={"Authentication": "Basic abcd"}, text="ok")
+        m.get(
+            "https://httpbin.org/v2/_catalog",
+            headers={"Authentication": "Basic abcd"},
+            text="ok",
+        )
         assert registry._request("/v2/_catalog").text == "ok"
 
 

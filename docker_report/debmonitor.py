@@ -21,6 +21,7 @@ docker-report-debmonitor - Submits data about packages present in a docker image
 Takes 2 arguments - the image full name and the directory where to store the
 report.
 """
+
 import argparse
 import logging
 import os

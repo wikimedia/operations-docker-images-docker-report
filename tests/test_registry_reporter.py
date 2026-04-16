@@ -49,7 +49,9 @@ def test_args_complex():
 
 
 @pytest.mark.parametrize(
-    "browser", [["--exclude-namespaces", "debug", "pinkunicorn", "--registry", "httpbin.org"]], indirect=True
+    "browser",
+    [["--exclude-namespaces", "debug", "pinkunicorn", "--registry", "httpbin.org"]],
+    indirect=True,
 )
 def test_setup_exclude_ns(browser):
     assert len(browser.name_filters) == 1
@@ -62,7 +64,17 @@ def test_setup_exclude_ns(browser):
 
 
 @pytest.mark.parametrize(
-    "browser", [["--exclude-tag-regexp", "latest", "--no-exclude-naked", "--registry", "httpbin.org"]], indirect=True
+    "browser",
+    [
+        [
+            "--exclude-tag-regexp",
+            "latest",
+            "--no-exclude-naked",
+            "--registry",
+            "httpbin.org",
+        ]
+    ],
+    indirect=True,
 )
 def test_setup_tag_regexp_allow_sha1(browser):
     """Test basic setup of a browser, with tag regexes."""
@@ -73,7 +85,10 @@ def test_setup_tag_regexp_allow_sha1(browser):
 
 @mock.patch("docker_report.reporter._filters_from_file")
 def test_setup_filters_from_file(mocker):
-    mocker.return_value = ([lambda x: "foo/" not in x], [lambda data: data[1] != "latest"])
+    mocker.return_value = (
+        [lambda x: "foo/" not in x],
+        [lambda data: data[1] != "latest"],
+    )
     RegistryBrowser.tag_filters = []
     RegistryBrowser.name_filters = []
     opts = reporter.parse_args(["--filter-file", "test.ini", "--registry", "httpbin.org"])
@@ -252,7 +267,10 @@ def test_pprint_fail(stdout, rep):
 @mock.patch("docker_report.reporter.Reporter")
 def test_main_happy_path(rep):
     instance = rep.return_value
-    instance.get_images.return_value = ["example.org/pinkunicorn:production", "example.org/test:latest"]
+    instance.get_images.return_value = [
+        "example.org/pinkunicorn:production",
+        "example.org/test:latest",
+    ]
     with mock.patch("docker_report.reporter._tempdir") as td:
         # This file will be removed
         td.return_value = tempfile.mkdtemp()
@@ -266,7 +284,10 @@ def test_main_happy_path(rep):
 @mock.patch("docker_report.reporter.Reporter")
 def test_main_exception(rep):
     instance = rep.return_value
-    instance.get_images.return_value = ["example.org/pinkunicorn:production", "example.org/test:latest"]
+    instance.get_images.return_value = [
+        "example.org/pinkunicorn:production",
+        "example.org/test:latest",
+    ]
     instance.run_report.side_effect = ValueError("I don't trust pink unicorns")
     with mock.patch("docker_report.reporter._tempdir") as td:
         # This file will be removed

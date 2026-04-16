@@ -46,7 +46,12 @@ def test_list_tags(fake_stdout):
     with mock.patch("docker_report.registry.operations.RegistryOperations") as base_mocker:
         ops = base_mocker.return_value
         # Last tag is a fake sha1 to check it doesn't appear in the output.
-        ops.get_tags_for_image.return_value = ["foo", "foobar", "boofar", "926952c71ed2b5a94c1b9d52adf70129dfcb4bar"]
+        ops.get_tags_for_image.return_value = [
+            "foo",
+            "foobar",
+            "boofar",
+            "926952c71ed2b5a94c1b9d52adf70129dfcb4bar",
+        ]
         registryctl.list_tags("httpbin.org", "test", "*bar")
     assert "  - foobar" in fake_stdout.getvalue()
     assert "boofar" not in fake_stdout.getvalue()

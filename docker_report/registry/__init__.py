@@ -48,7 +48,11 @@ class Registry:
     """Base class for interactions with a docker registry"""
 
     def __init__(
-        self, registry: str, logger: logging.Logger = logger, configfile: Optional[str] = None, protocol: str = "https"
+        self,
+        registry: str,
+        logger: logging.Logger = logger,
+        configfile: Optional[str] = None,
+        protocol: str = "https",
     ):
         self.registry_url = registry
         self.logger = logger
