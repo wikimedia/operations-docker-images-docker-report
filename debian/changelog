@@ -1,3 +1,12 @@
+docker-report (0.0.18-1) bookworm-wikimedia; urgency=medium
+
+  * Drop py39 in CI
+  * Add py313 in CI
+  * Automatic reformatting
+  * Ensure the system python is used in the docker images
+
+ -- Balthazar Rouberol <brouberol@wikimedia.org>  Thu, 16 Apr 2025 15:08:00 +0100
+
 docker-report (0.0.17-1) bookworm-wikimedia; urgency=medium
 
   * Add support to filter k8s images by name.
