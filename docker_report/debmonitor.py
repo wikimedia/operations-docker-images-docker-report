@@ -105,9 +105,10 @@ class DockerReport:
             proxy_inject,
             "apt-get update",
             "apt-get install --yes --no-install-recommends debmonitor-client",
-            # We unset PYTHONPATH for the cases of an image with several python versions installed, and a tweaked
-            # PYTYHONPATH (eg Growthbook). By doing this, we ensure we target the system python installation.
-            "unset PYTHONPATH; /usr/bin/debmonitor-client -n -i '{img}' > '{fname}'".format(
+            # We unset PYTHONPATH and PYTHONHOME for the cases of an image with several python versions installed,
+            # and a tweaked PYTYHONPATH/PYTHONHOME (eg Growthbook or ML images). By doing this,
+            # we ensure we target the system python installation.
+            "unset PYTHONPATH; unset PYTHONHOME; /usr/bin/debmonitor-client -n -i '{img}' > '{fname}'".format(
                 img=self.image, fname=container_filename
             ),
         ]
