@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import pytest
@@ -140,7 +141,13 @@ def parse_multipart_body(request: requests_mock.request._RequestObjectProxy, sec
                 return part.get_content()
 
 
-@mock.patch.object(Path, "open", new_callable=mock.mock_open, read_data=b"aa\nbb")
+# NOTE: we can't use mock.mock_open here. Since requests 2.34.2, _encode_files
+# detects file objects via isinstance(fp, SupportsRead), a @runtime_checkable
+# Protocol. On Python 3.12+ that check uses inspect.getattr_static, which does
+# not see MagicMock's dynamically-created "read" attribute, so a mock_open handle
+# is not recognized as a file and requests hands the raw mock to urllib3.
+# Returning a real io.BytesIO (itself a context manager yielding self) avoids this.
+@mock.patch.object(Path, "open", side_effect=lambda *a, **k: io.BytesIO(b"aa\nbb"))
 def test_upload_chart(open_mock, chartmuseum, req_mock):
     with req_mock as r_mock:
         res = chartmuseum.upload_chart("baz", Path("some/chart-0.0.1.tgz"))
