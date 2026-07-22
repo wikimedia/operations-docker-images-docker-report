@@ -1,3 +1,13 @@
+docker-report (0.0.19-1) bookworm-wikimedia; urgency=medium
+
+  * Fix tests for chartmuseum when using recent versions of
+    Python requests.
+  * Unset PYTHONHOME when running the debmonitor-client to
+    avoid runtime failures with ML images setting multiple
+    Python versions.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Wed, 22 Jul 2026 10:25:00 +0200
+
 docker-report (0.0.18-1) bookworm-wikimedia; urgency=medium
 
   * Drop py39 in CI
