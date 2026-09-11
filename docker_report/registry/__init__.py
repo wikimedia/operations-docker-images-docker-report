@@ -60,6 +60,15 @@ class Registry:
         self.protocol = protocol
 
     def _get_auth_token(self, filename: Optional[str] = None) -> Optional[str]:
+        """Read the credentials for this registry from a docker config.json.
+
+        When the caller asked for a specific file, any failure to get credentials out of
+        it is fatal: the user explicitly wanted those credentials, so falling back to
+        anonymous access would silently do something other than what was asked.
+        The implicit default is instead allowed to be missing or useless, as anonymous
+        access to a registry is perfectly normal.
+        """
+        explicit = filename is not None
         if filename is None:
             filename = os.path.expanduser("~/.docker/config.json")
         try:
@@ -69,15 +78,21 @@ class Registry:
             for reg in [self.registry_url, "https://{}".format(self.registry_url)]:
                 if reg in auths:
                     return auths[reg]["auth"]
+            reason = "it contains no credentials for registry '{}'".format(self.registry_url)
         except (KeyError, TypeError):
             # The config has nothing about our registry.
-            pass
-        except (FileNotFoundError, PermissionError):
+            reason = "it contains no 'auths' entry for registry '{}'".format(self.registry_url)
+        except (FileNotFoundError, PermissionError) as exc:
             # No config file present, or it's not readable, we move on
-            pass
-        except json.decoder.JSONDecodeError:
+            reason = "it is not readable ({})".format(exc.strerror)
+        except json.decoder.JSONDecodeError as exc:
             # Config file is malformed. log it and move on
-            self.logger.warning("Could not read the settings file.")
+            reason = "it is not valid JSON ({})".format(exc)
+            if not explicit:
+                self.logger.warning("Could not read the settings file '%s': %s", filename, exc)
+        if explicit:
+            raise RegistryError("Could not use the credentials file '{}': {}.".format(filename, reason))
+        self.logger.debug("No credentials found in '%s', proceeding anonymously.", filename)
         return None
 
     def _request(self, url_part: str, method: str = "GET", use_v2: bool = False) -> requests.Response:

@@ -69,6 +69,13 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         action="store_true",
         help="Do not ask for confirmation of the deletion.",
     )
+    parser.add_argument(
+        "--credentials",
+        "-c",
+        metavar="CONFIG_JSON",
+        default=None,
+        help="path to a docker credentials config.json (default: ~/.docker/config.json)",
+    )
     log = parser.add_mutually_exclusive_group()
     log.add_argument("--debug", "-d", action="store_true", default=False, help="enable debugging")
     log.add_argument(
@@ -100,9 +107,9 @@ def exclude_naked(img_tag: Tuple[str, str]) -> bool:
     return not SHA1REGEX.search(img_tag[1])
 
 
-def list_images(registry: str, filterglob: str):
+def list_images(registry: str, filterglob: str, configfile: Optional[str] = None):
     """Implementation of the list-images action"""
-    rb = browser.RegistryBrowser(registry, logger=logger)
+    rb = browser.RegistryBrowser(registry, logger=logger, configfile=configfile)
 
     def filter_glob(name):
         return fnmatch.fnmatch(name, filterglob)
@@ -118,9 +125,9 @@ def list_images(registry: str, filterglob: str):
             print("  - {}".format(tag))
 
 
-def list_tags(registry_name: str, name: str, filterglob: str):
+def list_tags(registry_name: str, name: str, filterglob: str, configfile: Optional[str] = None):
     """Implementation of the list-tags action"""
-    registry = operations.RegistryOperations(registry_name, logger=logger)
+    registry = operations.RegistryOperations(registry_name, logger=logger, configfile=configfile)
     print("-- ")
     print("{}:".format(name))
     for tag in fnmatch.filter(registry.get_tags_for_image(name), filterglob):
@@ -128,8 +135,14 @@ def list_tags(registry_name: str, name: str, filterglob: str):
             print("  - {}".format(tag))
 
 
-def delete_tags(registry_name: str, name: str, filterglob: str, force: bool = False):
-    registry = operations.RegistryOperations(registry_name, logger=logger)
+def delete_tags(
+    registry_name: str,
+    name: str,
+    filterglob: str,
+    force: bool = False,
+    configfile: Optional[str] = None,
+):
+    registry = operations.RegistryOperations(registry_name, logger=logger, configfile=configfile)
     if not force:
         to_remove = fnmatch.filter(registry.get_tags_for_image(name), filterglob)
         if len(to_remove) > 1:
@@ -160,11 +173,17 @@ def main(args=None):
     retcode = 0
     try:
         if options.action == "list-images":
-            list_images(options.registry, options.select)
+            list_images(options.registry, options.select, configfile=options.credentials)
         elif options.action == "list-tags":
-            list_tags(options.registry, options.image_name, options.select)
+            list_tags(options.registry, options.image_name, options.select, configfile=options.credentials)
         elif options.action == "delete-tags":
-            delete_tags(options.registry, options.image_name, options.select, options.force)
+            delete_tags(
+                options.registry,
+                options.image_name,
+                options.select,
+                options.force,
+                configfile=options.credentials,
+            )
         else:
             logger.error("non-implemented action")
             retcode = 3

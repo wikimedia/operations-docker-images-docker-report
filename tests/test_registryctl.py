@@ -108,7 +108,7 @@ def test_delete_tags_single(base_mocker):
 def test_main_list_images(m):
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["list-images", "--select", "*foobar*", "httpbin.org"])
-        m.assert_called_with("httpbin.org", "*foobar*")
+    m.assert_called_with("httpbin.org", "*foobar*", configfile=None)
     assert exc_info.value.code == 0
 
 
@@ -117,7 +117,7 @@ def test_main_list_tags(m):
     m.side_effect = registryctl.RegistryError("fail")
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["--silent", "list-tags", "httpbin.org/foo/bar:1.*"])
-    m.assert_called_with("httpbin.org", "foo/bar", "1.*")
+    m.assert_called_with("httpbin.org", "foo/bar", "1.*", configfile=None)
     assert exc_info.value.code == 2
 
 
@@ -126,8 +126,16 @@ def test_main_delete_tags(m):
     m.side_effect = Exception("unicorns!")
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["delete-tags", "--force", "httpbin.org/foo/bar:1.*"])
-    m.assert_called_with("httpbin.org", "foo/bar", "1.*", True)
+    m.assert_called_with("httpbin.org", "foo/bar", "1.*", True, configfile=None)
     assert exc_info.value.code == 1
+
+
+@mock.patch("docker_report.registryctl.delete_tags")
+def test_main_credentials(m):
+    with pytest.raises(SystemExit) as exc_info:
+        registryctl.main(["--credentials", "/nonexistent/config.json", "delete-tags", "-f", "httpbin.org/foo:1.*"])
+    m.assert_called_with("httpbin.org", "foo", "1.*", True, configfile="/nonexistent/config.json")
+    assert exc_info.value.code == 0
 
 
 @mock.patch("docker_report.registryctl.parse_args")
