@@ -1,3 +1,10 @@
+docker-report (0.0.20-1) trixie-wikimedia; urgency=medium
+
+  * Upgrade the target distribution to trixie-wikimedia.
+  * Allow docker-registryctl to use a custom path for credentials.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Tue, 15 Sep 2026 12:33:00 +0200
+
 docker-report (0.0.19-1) bookworm-wikimedia; urgency=medium
 
   * Fix tests for chartmuseum when using recent versions of
