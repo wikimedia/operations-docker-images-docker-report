@@ -141,10 +141,12 @@ class KubernetesBrowser(Browser):
         images: defaultdict[str, Counter] = defaultdict(Counter)
 
         for pod in ret.items:
-            namespace = pod.metadata.namespace
+            if pod.metadata is None or pod.status is None:
+                continue
             if not pod.status.container_statuses:
                 continue
 
+            namespace = pod.metadata.namespace
             for container in pod.status.container_statuses:
                 # If an image is deployed with its sha256-digest,
                 # we'll get something like the following from the Kube API:
