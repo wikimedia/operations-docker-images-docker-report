@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import fnmatch
-from typing import List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import requests
 
@@ -30,8 +30,16 @@ class RegistryOperations(Registry):
         resp = self._request("/v2/{}/manifests/{}".format(name, tag), use_v2=True)
         return resp.headers.get("Docker-Content-Digest", "")
 
-    def delete_image(self, name: str, tag_glob: str) -> Tuple[List[str], List[str], List[str]]:
+    def delete_image(
+        self,
+        name: str,
+        tag_glob: str,
+        tag_filter: Optional[Callable[[str], bool]] = None,
+    ) -> Tuple[List[str], List[str], List[str]]:
         """Delete a specific tag (or tag glob) from an image.
+
+        If tag_filter is provided, only the tags matching the glob for which it returns
+        True are removed.
 
         Two lists are returned, in a tuple: the list of all processed tags, and the list of tags
         that we failed to remove.
@@ -41,6 +49,8 @@ class RegistryOperations(Registry):
         # let's find all the tags corresponding to the glob
         tags = self.get_tags_for_image(name)
         selected_tags = fnmatch.filter(tags, tag_glob)
+        if tag_filter is not None:
+            selected_tags = [tag for tag in selected_tags if tag_filter(tag)]
         for tag in selected_tags:
             try:
                 digest = self._image_digest(name, tag)

@@ -29,13 +29,83 @@ import fnmatch
 import logging
 import re
 import sys
-from typing import List, Optional, Tuple
+from datetime import date, datetime
+from typing import List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 from docker_report import CustomFormatter, setup_logging
 from docker_report.registry import RegistryError, browser, operations
 
 logger = logging.getLogger("docker-registryctl")
+
+
+# A date embedded in a tag, as YYYY-MM-DD, YYYYMMDD or YYYY_MM_DD. The lookaround
+# assertions avoid picking up a slice of a longer run of digits (say a build number).
+DATE_IN_TAG_REGEX = re.compile(r"(?<!\d)((?:19|20)\d{2})[-_]?(\d{2})[-_]?(\d{2})(?!\d)")
+
+# The formats accepted for the --older-than argument.
+DATE_INPUT_FORMATS = ("%Y-%m-%d", "%Y%m%d")
+
+
+def parse_date(datestr: str) -> date:
+    """Parse a date provided on the command line."""
+    for fmt in DATE_INPUT_FORMATS:
+        try:
+            return datetime.strptime(datestr, fmt).date()
+        except ValueError:
+            continue
+    raise argparse.ArgumentTypeError("'{}' is not a valid date (expected YYYY-MM-DD or YYYYMMDD)".format(datestr))
+
+
+def date_from_tag(tag: str) -> Optional[date]:
+    """Extract the date embedded in a tag, or None if the tag doesn't contain one."""
+    for match in DATE_IN_TAG_REGEX.finditer(tag):
+        try:
+            return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        except ValueError:
+            # Looked like a date but isn't one (say, month 13); keep looking.
+            continue
+    return None
+
+
+class OlderThanFilter:
+    """Tag filter selecting the tags whose embedded date is strictly older than a limit.
+
+    Tags that don't contain a recognizable date are never selected. The tags that get
+    rejected are recorded, so that the caller can explain why nothing was selected.
+    They're kept in sets as the same filter is applied more than once per run.
+    """
+
+    def __init__(self, limit: date):
+        self.limit = limit
+        self.undated: Set[str] = set()
+        self.too_recent: Set[str] = set()
+
+    def __call__(self, tag: str) -> bool:
+        tag_date = date_from_tag(tag)
+        if tag_date is None:
+            if tag not in self.undated:
+                logger.debug("Skipping tag '%s': no date found in it", tag)
+                self.undated.add(tag)
+            return False
+        if tag_date >= self.limit:
+            self.too_recent.add(tag)
+            return False
+        return True
+
+    @property
+    def rejected(self) -> int:
+        """The number of distinct tags this filter has rejected."""
+        return len(self.undated) + len(self.too_recent)
+
+    def explain(self) -> str:
+        """A human-readable summary of what was rejected and why."""
+        reasons = []
+        if self.undated:
+            reasons.append("{} with no date in the tag".format(len(self.undated)))
+        if self.too_recent:
+            reasons.append("{} not old enough".format(len(self.too_recent)))
+        return ", ".join(reasons)
 
 
 def parse_args(args: Optional[List] = None) -> argparse.Namespace:
@@ -68,6 +138,17 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         "-f",
         action="store_true",
         help="Do not ask for confirmation of the deletion.",
+    )
+    delete_tags.add_argument(
+        "--older-than",
+        metavar="DATE",
+        type=parse_date,
+        default=None,
+        help="Only delete tags that contain a date (YYYY-MM-DD, YYYYMMDD or YYYY_MM_DD) "
+        "strictly older than DATE, expressed as YYYY-MM-DD or YYYYMMDD. "
+        "Tags with no recognizable date are never deleted. "
+        "Please note: special tags like latest/stable/etc.. that point to the same manifest "
+        "that is going to be deleted will also be deleted.",
     )
     parser.add_argument(
         "--credentials",
@@ -141,10 +222,14 @@ def delete_tags(
     filterglob: str,
     force: bool = False,
     configfile: Optional[str] = None,
+    older_than: Optional[date] = None,
 ):
     registry = operations.RegistryOperations(registry_name, logger=logger, configfile=configfile)
+    tag_filter = None if older_than is None else OlderThanFilter(older_than)
     if not force:
         to_remove = fnmatch.filter(registry.get_tags_for_image(name), filterglob)
+        if tag_filter is not None:
+            to_remove = [tag for tag in to_remove if tag_filter(tag)]
         if len(to_remove) > 1:
             print("We're about to delete the following tags for image {}/{}:".format(registry_name, name))
             for tag in to_remove:
@@ -153,7 +238,15 @@ def delete_tags(
             if resp.lower() != "y":
                 print("Aborting.")
                 return
-    selected, failed, not_found = registry.delete_image(name, filterglob)
+    selected, failed, not_found = registry.delete_image(name, filterglob, tag_filter)
+    if tag_filter is not None and not selected and tag_filter.rejected:
+        # The glob matched something, but the date filter rejected all of it. Say so,
+        # otherwise the run looks identical to one that matched no tags at all.
+        print(
+            "No tags for image {}/{} matching '{}' are older than {}: skipped {}.".format(
+                registry_name, name, filterglob, tag_filter.limit.isoformat(), tag_filter.explain()
+            )
+        )
     for tag in selected:
         fullname = "{}/{}:{}".format(registry_name, name, tag)
         if tag in failed:
@@ -183,6 +276,7 @@ def main(args=None):
                 options.select,
                 options.force,
                 configfile=options.credentials,
+                older_than=options.older_than,
             )
         else:
             logger.error("non-implemented action")

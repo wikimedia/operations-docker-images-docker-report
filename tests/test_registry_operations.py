@@ -46,6 +46,19 @@ def test_delete_image(operations):
         assert m.request_history[1].method == "DELETE"
 
 
+def test_delete_image_tag_filter(operations):
+    """Only the tags matching both the glob and the filter are deleted"""
+    operations.get_tags_for_image = mock.MagicMock(return_value=["a", "b", "atest", "latest"])
+    with requests_mock.Mocker() as m:
+        m.get(
+            "https://httpbin.org/v2/foobar/manifests/atest",
+            headers={"Docker-Content-Digest": "ok"},
+        )
+        m.delete("https://httpbin.org/v2/foobar/manifests/ok", status_code=202)
+        assert operations.delete_image("foobar", "*test", lambda tag: tag.startswith("a")) == (["atest"], [], [])
+        assert m.call_count == 2
+
+
 def test_delete_image_no_match(operations):
     """If no match is found, nothing happens"""
     operations.get_tags_for_image = mock.MagicMock(return_value=["a", "b", "atest", "latest"])
