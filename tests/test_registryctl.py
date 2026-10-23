@@ -259,6 +259,194 @@ def test_delete_tags_no_message_without_older_than(base_mocker, fake_stdout):
     assert fake_stdout.getvalue() == ""
 
 
+def test_parse_args_delete_tags_keep_latest():
+    options = registryctl.parse_args(["delete-tags", "-f", "--keep-latest-n-images", "3", "httpbin.org/foo/bar:*"])
+    assert options.keep_latest_n_images == 3
+    # Without the flag, nothing is protected.
+    options = registryctl.parse_args(["delete-tags", "-f", "httpbin.org/foo/bar:*"])
+    assert options.keep_latest_n_images is None
+
+
+def test_parse_args_keep_latest_without_force():
+    """The guardrail is not tied to --force: it also trims the confirmation prompt."""
+    options = registryctl.parse_args(["delete-tags", "--keep-latest-n-images", "3", "httpbin.org/foo/bar:*"])
+    assert options.keep_latest_n_images == 3
+    assert options.force is False
+
+
+@pytest.mark.parametrize("value", ["-1", "a few"])
+def test_parse_args_keep_latest_rejects_invalid_values(value):
+    """A negative count would protect the tags from the wrong end of the list."""
+    with pytest.raises(SystemExit) as exc_info:
+        registryctl.parse_args(["delete-tags", "-f", "--keep-latest-n-images", value, "httpbin.org/foo/bar:*"])
+    assert exc_info.value.code == 2
+
+
+@pytest.mark.parametrize(
+    "tags,expected",
+    [
+        # The date in the tag is what ranks them, not the rest of the tag.
+        (["2021-03-05-aaaaaa", "2021-03-04-zzzzzz"], ["2021-03-05-aaaaaa", "2021-03-04-zzzzzz"]),
+        # Same day: the tag name breaks the tie, which orders by time of the day.
+        (["2021-03-04-091500", "2021-03-04-174500"], ["2021-03-04-174500", "2021-03-04-091500"]),
+        # Tags with no date in them rank as the oldest ones.
+        (["latest", "2021-03-04-aaaaaa"], ["2021-03-04-aaaaaa", "latest"]),
+        (["latest", "stable"], ["stable", "latest"]),
+    ],
+)
+def test_sort_tags_newest_first(tags, expected):
+    assert registryctl.sort_tags_newest_first(tags) == expected
+
+
+def test_keep_latest_filter():
+    tags = ["2021-03-02-aaaaaa", "2021-03-03-bbbbbb", "2021-03-05-cccccc", "latest"]
+    keep = registryctl.KeepLatestFilter(tags, 2)
+    assert keep.protected == ["2021-03-05-cccccc", "2021-03-03-bbbbbb"]
+    assert not keep("2021-03-05-cccccc")
+    assert not keep("2021-03-03-bbbbbb")
+    assert keep("2021-03-02-aaaaaa")
+    assert keep("latest")
+
+
+def test_keep_latest_filter_more_than_available():
+    """Asking to keep more tags than there are protects all of them."""
+    keep = registryctl.KeepLatestFilter(["2021-03-02-aaaaaa", "2021-03-02-aaaaaa"], 10)
+    assert keep.protected == ["2021-03-02-aaaaaa"]
+    assert not keep("2021-03-02-aaaaaa")
+
+
+def test_all_of():
+    assert registryctl.all_of([]) is None
+    is_a = mock.Mock(return_value=True)
+    assert registryctl.all_of([is_a]) is is_a
+    is_b = mock.Mock(return_value=False)
+    combined = registryctl.all_of([is_a, is_b])
+    assert combined is not None
+    assert not combined("tag")
+    # The second filter never sees a tag the first one has already rejected.
+    assert not registryctl.all_of([is_b, is_a])("other-tag")
+    is_a.assert_called_once_with("tag")
+
+
+@mock.patch("sys.stdout", new_callable=io.StringIO)
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest(base_mocker, fake_stdout):
+    """The most recent tags are kept even if --older-than selects them."""
+    tags = [
+        "2021-03-01-aaaaaa",
+        "2021-03-02-bbbbbb",
+        "2021-03-03-cccccc",
+        "latest",
+    ]
+    ops = base_mocker.return_value
+    ops.get_tags_for_image.return_value = tags
+    ops.delete_image.side_effect = fake_delete_image(tags)
+    registryctl.delete_tags("httpbin.org", "test", "*", True, older_than=date(2021, 3, 4), keep_latest=2)
+    name, glob, tag_filter = ops.delete_image.call_args[0]
+    assert (name, glob) == ("test", "*")
+    assert [t for t in tags if tag_filter(t)] == ["2021-03-01-aaaaaa"]
+    out = fake_stdout.getvalue()
+    assert "Keeping the 2 most recent tags for image httpbin.org/test: " in out
+    assert "2021-03-03-cccccc, 2021-03-02-bbbbbb." in out
+
+
+@mock.patch("sys.stdout", new_callable=io.StringIO)
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest_without_older_than(base_mocker, fake_stdout):
+    """On its own, the guardrail deletes everything but the most recent tags."""
+    tags = ["2021-03-01-aaaaaa", "2021-03-02-bbbbbb", "2021-03-03-cccccc"]
+    ops = base_mocker.return_value
+    ops.get_tags_for_image.return_value = tags
+    ops.delete_image.side_effect = fake_delete_image(tags)
+    registryctl.delete_tags("httpbin.org", "test", "*", True, keep_latest=1)
+    _, _, tag_filter = ops.delete_image.call_args[0]
+    assert [t for t in tags if tag_filter(t)] == ["2021-03-01-aaaaaa", "2021-03-02-bbbbbb"]
+    assert "Keeping the 1 most recent tag for image httpbin.org/test: 2021-03-03-cccccc." in fake_stdout.getvalue()
+
+
+@mock.patch("sys.stdout", new_callable=io.StringIO)
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest_confirmation(base_mocker, fake_stdout):
+    """Without --force, the kept tags are reported and left out of the prompt."""
+    tags = [
+        "2021-03-01-aaaaaa",
+        "2021-03-02-bbbbbb",
+        "2021-03-03-cccccc",
+    ]
+    ops = base_mocker.return_value
+    ops.get_tags_for_image.return_value = tags
+    with mock.patch("builtins.input") as i:
+        i.return_value = "n"
+        registryctl.delete_tags("httpbin.org", "test", "*", False, keep_latest=1)
+    assert i.call_count == 1
+    out = fake_stdout.getvalue()
+    assert "Keeping the 1 most recent tag for image httpbin.org/test: 2021-03-03-cccccc." in out
+    prompt = out.split("We're about to delete the following tags")[1]
+    assert "2021-03-01-aaaaaa" in prompt
+    assert "2021-03-02-bbbbbb" in prompt
+    assert "2021-03-03-cccccc" not in prompt
+    # The tags are looked up once, not once per use.
+    assert ops.get_tags_for_image.call_count == 1
+    assert ops.delete_image.call_count == 0
+
+
+@mock.patch("sys.stdout", new_callable=io.StringIO)
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest_protects_everything(base_mocker, fake_stdout):
+    """Nothing is deleted when the guardrail covers all the tags the glob matched."""
+    tags = ["2021-03-01-aaaaaa", "2021-03-02-bbbbbb"]
+    ops = base_mocker.return_value
+    ops.get_tags_for_image.return_value = tags
+    ops.delete_image.side_effect = fake_delete_image(tags)
+    registryctl.delete_tags("httpbin.org", "test", "*", True, older_than=date(2021, 3, 4), keep_latest=5)
+    assert ops.delete_image.call_args[0][2]("2021-03-01-aaaaaa") is False
+    out = fake_stdout.getvalue()
+    assert "Keeping the 2 most recent tags" in out
+    # The tags are kept, not rejected for being too recent: don't claim otherwise.
+    assert "are older than" not in out
+
+
+@mock.patch("sys.stdout", new_callable=io.StringIO)
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest_no_candidates(base_mocker, fake_stdout):
+    """With nothing matching the glob there is nothing to protect, and nothing to say."""
+    ops = base_mocker.return_value
+    ops.get_tags_for_image.return_value = ["latest"]
+    ops.delete_image.side_effect = fake_delete_image(["latest"])
+    registryctl.delete_tags("httpbin.org", "test", "nomatch*", True, keep_latest=3)
+    assert fake_stdout.getvalue() == ""
+
+
+@mock.patch("docker_report.registry.operations.RegistryOperations")
+def test_delete_tags_keep_latest_zero(base_mocker):
+    """Keeping zero tags is a no-op, and doesn't even look the tags up."""
+    ops = base_mocker.return_value
+    ops.delete_image.return_value = ([], [], [])
+    registryctl.delete_tags("httpbin.org", "test", "*", True, keep_latest=0)
+    assert ops.get_tags_for_image.call_count == 0
+    ops.delete_image.assert_called_with("test", "*", None)
+
+
+@mock.patch("docker_report.registryctl.delete_tags")
+def test_main_delete_tags_keep_latest(m):
+    with pytest.raises(SystemExit) as exc_info:
+        registryctl.main(
+            ["delete-tags", "-f", "--older-than", "20210304", "--keep-latest-n-images", "3", "httpbin.org/foo/bar:*"]
+        )
+    m.assert_called_with(
+        "httpbin.org", "foo/bar", "*", True, configfile=None, older_than=date(2021, 3, 4), keep_latest=3
+    )
+    assert exc_info.value.code == 0
+
+
+@mock.patch("docker_report.registryctl.delete_tags")
+def test_main_delete_tags_keep_latest_without_force(m):
+    with pytest.raises(SystemExit) as exc_info:
+        registryctl.main(["delete-tags", "--keep-latest-n-images", "3", "httpbin.org/foo/bar:*"])
+    m.assert_called_with("httpbin.org", "foo/bar", "*", False, configfile=None, older_than=None, keep_latest=3)
+    assert exc_info.value.code == 0
+
+
 @mock.patch("docker_report.registryctl.list_images")
 def test_main_list_images(m):
     with pytest.raises(SystemExit) as exc_info:
@@ -281,7 +469,7 @@ def test_main_delete_tags(m):
     m.side_effect = Exception("unicorns!")
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["delete-tags", "--force", "httpbin.org/foo/bar:1.*"])
-    m.assert_called_with("httpbin.org", "foo/bar", "1.*", True, configfile=None, older_than=None)
+    m.assert_called_with("httpbin.org", "foo/bar", "1.*", True, configfile=None, older_than=None, keep_latest=None)
     assert exc_info.value.code == 1
 
 
@@ -289,7 +477,9 @@ def test_main_delete_tags(m):
 def test_main_delete_tags_older_than(m):
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["delete-tags", "-f", "--older-than", "20210304", "httpbin.org/foo/bar:*"])
-    m.assert_called_with("httpbin.org", "foo/bar", "*", True, configfile=None, older_than=date(2021, 3, 4))
+    m.assert_called_with(
+        "httpbin.org", "foo/bar", "*", True, configfile=None, older_than=date(2021, 3, 4), keep_latest=None
+    )
     assert exc_info.value.code == 0
 
 
@@ -306,7 +496,9 @@ def test_main_delete_tags_bad_date(m):
 def test_main_credentials(m):
     with pytest.raises(SystemExit) as exc_info:
         registryctl.main(["--credentials", "/nonexistent/config.json", "delete-tags", "-f", "httpbin.org/foo:1.*"])
-    m.assert_called_with("httpbin.org", "foo", "1.*", True, configfile="/nonexistent/config.json", older_than=None)
+    m.assert_called_with(
+        "httpbin.org", "foo", "1.*", True, configfile="/nonexistent/config.json", older_than=None, keep_latest=None
+    )
     assert exc_info.value.code == 0
 
 

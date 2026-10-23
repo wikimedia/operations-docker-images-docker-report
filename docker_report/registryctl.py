@@ -30,7 +30,7 @@ import logging
 import re
 import sys
 from datetime import date, datetime
-from typing import List, Optional, Set, Tuple
+from typing import Callable, Iterable, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
 from docker_report import CustomFormatter, setup_logging
@@ -45,6 +45,9 @@ DATE_IN_TAG_REGEX = re.compile(r"(?<!\d)((?:19|20)\d{2})[-_]?(\d{2})[-_]?(\d{2})
 
 # The formats accepted for the --older-than argument.
 DATE_INPUT_FORMATS = ("%Y-%m-%d", "%Y%m%d")
+
+# A predicate deciding whether a tag should be deleted.
+TagFilter = Callable[[str], bool]
 
 
 def parse_date(datestr: str) -> date:
@@ -108,6 +111,55 @@ class OlderThanFilter:
         return ", ".join(reasons)
 
 
+def sort_tags_newest_first(tags: Iterable[str]) -> List[str]:
+    """Sort tags from the newest to the oldest.
+
+    What ranks a tag is the date embedded in it, for consistency with --older-than;
+    the tag itself only breaks ties between tags of the same day, which for the usual
+    YYYY-MM-DD-HHMMSS-flavour tags means ordering them by time of the day. Tags with
+    no recognizable date in them rank as the oldest, as there is nothing better to
+    compare them with.
+    """
+
+    def tag_date(tag: str) -> Tuple[date, str]:
+        parsed = date_from_tag(tag)
+        return (date.min if parsed is None else parsed, tag)
+
+    return sorted(tags, key=tag_date, reverse=True)
+
+
+class KeepLatestFilter:
+    """Tag filter rejecting the N most recent tags out of a set of candidates.
+
+    The tags to protect are picked once, upfront, out of all the tags that the run
+    could touch, and not out of what the other filters end up selecting: this way the
+    N most recent tags of an image survive the run no matter what, which is the point
+    of the guardrail. The filter is meant to run before the other ones, so that they
+    never get to see (nor account for) a tag that is protected anyway.
+    """
+
+    def __init__(self, candidates: Iterable[str], keep: int):
+        # Newest first, which is also the order we want to list them in.
+        self.protected: List[str] = sort_tags_newest_first(set(candidates))[:keep]
+        self._protected = frozenset(self.protected)
+
+    def __call__(self, tag: str) -> bool:
+        return tag not in self._protected
+
+
+def all_of(filters: List[TagFilter]) -> Optional[TagFilter]:
+    """Combine tag filters into a single one, or None if there is nothing to filter on."""
+    if not filters:
+        return None
+    if len(filters) == 1:
+        return filters[0]
+
+    def combined(tag: str) -> bool:
+        return all(tag_filter(tag) for tag_filter in filters)
+
+    return combined
+
+
 def parse_args(args: Optional[List] = None) -> argparse.Namespace:
     """Parse arguments."""
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=CustomFormatter)
@@ -150,6 +202,26 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         "Please note: special tags like latest/stable/etc.. that point to the same manifest "
         "that is going to be deleted will also be deleted.",
     )
+    delete_tags.add_argument(
+        "--keep-latest-n-images",
+        metavar="N",
+        type=int,
+        default=None,
+        help="Never delete the N most recent tags matching the glob, whatever the other "
+        "options would select. This is meant as a guardrail for unattended runs, so that "
+        "an image is never left without its most recent tags if nothing has been pushed to "
+        "it for a while. Without --force, the kept tags are reported and left out of the "
+        "list the confirmation prompt asks about. "
+        "Tags are ranked by the date they contain (the same dates --older-than looks at), "
+        "and ties between tags of the same day are broken by tag name. "
+        "Please note: tags with no recognizable date in them, like latest/stable, rank as "
+        "the oldest ones, so they never take up one of the N slots. Together with "
+        "--older-than that is harmless, as those tags are never deleted anyway; on its own, "
+        "this option does delete them. "
+        "Please also note: a kept tag still goes away if it points to the same manifest as "
+        "one that is being deleted, so what really keeps latest/stable alive is keeping the "
+        "dated tags they point to.",
+    )
     parser.add_argument(
         "--credentials",
         "-c",
@@ -178,6 +250,11 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         else:
             options.image_name = parsed.path[1:]
             options.select = "*"
+    if options.action == "delete-tags" and options.keep_latest_n_images is not None:
+        if options.keep_latest_n_images < 0:
+            # A negative count would otherwise slice the list of tags to protect from
+            # the wrong end, and quietly do something nobody asked for.
+            delete_tags.error("--keep-latest-n-images cannot be negative")
     return options
 
 
@@ -223,11 +300,39 @@ def delete_tags(
     force: bool = False,
     configfile: Optional[str] = None,
     older_than: Optional[date] = None,
+    keep_latest: Optional[int] = None,
 ):
     registry = operations.RegistryOperations(registry_name, logger=logger, configfile=configfile)
-    tag_filter = None if older_than is None else OlderThanFilter(older_than)
+    filters: List[TagFilter] = []
+    # Both the guardrail and the confirmation prompt need the tags the glob matches;
+    # look them up once, and only if one of the two is actually going to use them.
+    matching: List[str] = []
+    if keep_latest or not force:
+        matching = fnmatch.filter(registry.get_tags_for_image(name), filterglob)
+    keep_filter = None
+    if keep_latest:
+        # The tags to protect are chosen among everything the glob matches, before any
+        # other filter gets a say, and the filter goes first in the chain so that the
+        # others never see a protected tag.
+        keep_filter = KeepLatestFilter(matching, keep_latest)
+        if keep_filter.protected:
+            print(
+                "Keeping the {} most recent tag{} for image {}/{}: {}.".format(
+                    len(keep_filter.protected),
+                    "" if len(keep_filter.protected) == 1 else "s",
+                    registry_name,
+                    name,
+                    ", ".join(keep_filter.protected),
+                )
+            )
+        filters.append(keep_filter)
+    older_filter = None
+    if older_than is not None:
+        older_filter = OlderThanFilter(older_than)
+        filters.append(older_filter)
+    tag_filter = all_of(filters)
     if not force:
-        to_remove = fnmatch.filter(registry.get_tags_for_image(name), filterglob)
+        to_remove = matching
         if tag_filter is not None:
             to_remove = [tag for tag in to_remove if tag_filter(tag)]
         if len(to_remove) > 1:
@@ -239,12 +344,13 @@ def delete_tags(
                 print("Aborting.")
                 return
     selected, failed, not_found = registry.delete_image(name, filterglob, tag_filter)
-    if tag_filter is not None and not selected and tag_filter.rejected:
+    if older_filter is not None and not selected and older_filter.rejected:
         # The glob matched something, but the date filter rejected all of it. Say so,
-        # otherwise the run looks identical to one that matched no tags at all.
+        # otherwise the run looks identical to one that matched no tags at all. Tags
+        # kept by --keep-latest-n-images are not counted here, they're reported above.
         print(
             "No tags for image {}/{} matching '{}' are older than {}: skipped {}.".format(
-                registry_name, name, filterglob, tag_filter.limit.isoformat(), tag_filter.explain()
+                registry_name, name, filterglob, older_filter.limit.isoformat(), older_filter.explain()
             )
         )
     for tag in selected:
@@ -277,6 +383,7 @@ def main(args=None):
                 options.force,
                 configfile=options.credentials,
                 older_than=options.older_than,
+                keep_latest=options.keep_latest_n_images,
             )
         else:
             logger.error("non-implemented action")
