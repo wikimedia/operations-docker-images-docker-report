@@ -133,6 +133,31 @@ def test_parse_date():
         registryctl.parse_date("pink-unicorn")
 
 
+@pytest.mark.parametrize(
+    "datestr,expected",
+    [
+        ("3 weeks", date(2021, 3, 4)),
+        ("1 week", date(2021, 3, 18)),
+        ("10 days", date(2021, 3, 15)),
+        ("1day", date(2021, 3, 24)),
+        (" 2 Weeks ", date(2021, 3, 11)),
+        ("1 month", date(2021, 2, 23)),
+        ("2 months", date(2021, 1, 24)),
+        ("1 year", date(2020, 3, 25)),
+    ],
+)
+@mock.patch("docker_report.registryctl.date")
+def test_parse_date_relative(fake_date, datestr, expected):
+    fake_date.today.return_value = date(2021, 3, 25)
+    assert registryctl.parse_date(datestr) == expected
+
+
+@pytest.mark.parametrize("datestr", ["3 fortnights", "weeks", "-3 weeks", "3 weeks ago"])
+def test_parse_date_relative_invalid(datestr):
+    with pytest.raises(argparse.ArgumentTypeError):
+        registryctl.parse_date(datestr)
+
+
 def test_parse_args_delete_tags_older_than():
     options = registryctl.parse_args(["delete-tags", "--older-than", "2021-03-04", "httpbin.org/foo/bar:*"])
     assert options.older_than == date(2021, 3, 4)

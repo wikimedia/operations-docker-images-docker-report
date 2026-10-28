@@ -29,7 +29,7 @@ import fnmatch
 import logging
 import re
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Callable, Iterable, List, Optional, Set, Tuple
 from urllib.parse import urlparse
 
@@ -51,13 +51,24 @@ TagFilter = Callable[[str], bool]
 
 
 def parse_date(datestr: str) -> date:
-    """Parse a date provided on the command line."""
+    """Parse a date provided on the command line.
+
+    A relative value like "3 weeks" or "10 days" gives that amount of time before today.
+    A month is 30 days and a year is 365 days.
+    """
+    days_per_unit = {"day": 1, "week": 7, "month": 30, "year": 365}
+    relative = re.fullmatch(r"\s*(\d+)\s*(day|week|month|year)s?\s*", datestr, re.IGNORECASE)
+    if relative is not None:
+        days = int(relative.group(1)) * days_per_unit[relative.group(2).lower()]
+        return date.today() - timedelta(days=days)
     for fmt in DATE_INPUT_FORMATS:
         try:
             return datetime.strptime(datestr, fmt).date()
         except ValueError:
             continue
-    raise argparse.ArgumentTypeError("'{}' is not a valid date (expected YYYY-MM-DD or YYYYMMDD)".format(datestr))
+    raise argparse.ArgumentTypeError(
+        "'{}' is not a valid date (expected YYYY-MM-DD, YYYYMMDD or 'N days/weeks/months/years')".format(datestr)
+    )
 
 
 def date_from_tag(tag: str) -> Optional[date]:
@@ -197,7 +208,9 @@ def parse_args(args: Optional[List] = None) -> argparse.Namespace:
         type=parse_date,
         default=None,
         help="Only delete tags that contain a date (YYYY-MM-DD, YYYYMMDD or YYYY_MM_DD) "
-        "strictly older than DATE, expressed as YYYY-MM-DD or YYYYMMDD. "
+        "strictly older than DATE, expressed as YYYY-MM-DD, YYYYMMDD, or relative to today "
+        "as 'N days', 'N weeks', 'N months' (30 days) or 'N years' (365 days), "
+        "for example '3 weeks'. "
         "Tags with no recognizable date are never deleted. "
         "Please note: special tags like latest/stable/etc.. that point to the same manifest "
         "that is going to be deleted will also be deleted.",
