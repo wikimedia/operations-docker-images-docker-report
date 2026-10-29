@@ -1,3 +1,9 @@
+docker-report (0.0.23-1) trixie-wikimedia; urgency=medium
+
+  * Allow --older-than to accept values like '3 weeks'.
+
+ -- Luca Toscano <ltoscano@wikimedia.org>  Thu, 29 Oct 2026 10:00:00 +0200
+
 docker-report (0.0.22-1) trixie-wikimedia; urgency=medium
 
   * Add the --keep-n-latest-images parameter to docker-registryctl.
